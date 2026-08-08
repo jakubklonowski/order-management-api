@@ -1,0 +1,98 @@
+name: order-inventory-api
+
+services:
+  php:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: dev
+    container_name: oms_php
+    environment:
+      XDEBUG_MODE: ${XDEBUG_MODE:-off}
+    volumes:
+      - ./:/var/www/html
+    working_dir: /var/www/html
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - oms_network
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: oms_nginx
+    ports:
+      - "${NGINX_PORT:-8080}:80"
+    volumes:
+      - ./:/var/www/html
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      - php
+    networks:
+      - oms_network
+
+  database:
+    image: mysql:8.4
+    container_name: oms_database
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - oms_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: oms_redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - oms_network
+
+  # http://localhost:${ADMINER_PORT}
+  adminer:
+    image: adminer:latest
+    container_name: oms_adminer
+    environment:
+      ADMINER_DEFAULT_SERVER: database
+    ports:
+      - "${ADMINER_PORT:-8081}:8080"
+    depends_on:
+      - database
+    networks:
+      - oms_network
+
+  # http://localhost:${REDIS_COMMANDER_PORT}
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: oms_redis_commander
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "${REDIS_COMMANDER_PORT:-8082}:8081"
+    depends_on:
+      - redis
+    networks:
+      - oms_network
+
+networks:
+  oms_network:
+    driver: bridge
+
+volumes:
+  db_data:
+  redis_data:

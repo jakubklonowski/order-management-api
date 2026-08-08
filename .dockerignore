@@ -1,0 +1,14 @@
+.git
+.gitignore
+
+vendor
+
+var/cache
+var/log
+node_modules
+
+.env.local
+.env.local.php
+.env.*.local
+
+*.log
