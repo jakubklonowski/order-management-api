@@ -46,12 +46,12 @@ final class AuthController extends AbstractController
             return $this->json(['errors' => $errors], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        if ($users->findOneByEmail($dto->email) !== null) {
+        if ($users->findOneByEmail($dto->getEmail()) !== null) {
             return $this->json(['error' => 'Email already registered.'], Response::HTTP_CONFLICT);
         }
 
-        $user = new User($dto->email);
-        $user->setPassword($passwordHasher->hashPassword($user, $dto->password));
+        $user = new User($dto->getEmail());
+        $user->setPassword($passwordHasher->hashPassword($user, $dto->getPassword()));
 
         try {
             $em->persist($user);

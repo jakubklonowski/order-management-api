@@ -1,0 +1,204 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Api;
+
+use App\Entity\User;
+use App\Enum\UserRole;
+use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Symfony\Bundle\FrameworkBundle\KernelBrowser;
+use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+
+final class AuthTest extends WebTestCase
+{
+    private const EMAIL = 'user@domain.pl';
+    private const PASSWORD = 'pass1234';
+    private KernelBrowser $client;
+    private EntityManagerInterface $em;
+
+    protected function setUp(): void
+    {
+        $this->client = static::createClient();
+        $this->em = static::getContainer()->get(EntityManagerInterface::class);
+
+        $this->em->getConnection()->executeStatement('DELETE FROM users');
+    }
+
+    private function post(string $uri, string $body): void
+    {
+        $this->client->request('POST', $uri, server: ['CONTENT_TYPE' => 'application/json'], content: $body);
+    }
+
+    private function json(string $email = self::EMAIL, string $password = self::PASSWORD): string
+    {
+        return json_encode(['email' => $email, 'password' => $password], \JSON_THROW_ON_ERROR);
+    }
+
+    public function testRegisterCreatesUser(): void
+    {
+        $this->post('/api/register', $this->json());
+
+        self::assertResponseStatusCodeSame(201);
+        $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+
+        // in case of controller changes makes password leak
+        self::assertEqualsCanonicalizing(['id', 'email', 'role'], array_keys($response));
+        self::assertSame(self::EMAIL, $response['email']);
+        self::assertSame('customer', $response['role']);
+    }
+
+    public function testRegisterStoresHashedPassword(): void
+    {
+        $this->post('/api/register', $this->json());
+        self::assertResponseStatusCodeSame(201);
+
+        // clear EntityManager in case non-persisted entities from the same process exists inside it
+        $this->em->clear();
+        $user = $this->em->getRepository(User::class)->findOneByEmail(self::EMAIL);
+
+        self::assertNotNull($user);
+        // catches plaintext
+        self::assertStringStartsWith('$', $user->getPassword());
+        $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
+        self::assertTrue($hasher->isPasswordValid($user, self::PASSWORD));
+        self::assertSame(UserRole::Customer, $user->getRole());
+    }
+
+    public function testRegisterRejectsDuplicateEmail(): void
+    {
+        $this->post('/api/register', $this->json());
+        self::assertResponseStatusCodeSame(201);
+
+        $this->post('/api/register', $this->json());
+        self::assertResponseStatusCodeSame(409);
+    }
+
+    public function testRegisterRejectsInvalidPayload(): void
+    {
+        $this->post('/api/register', $this->json('not-an-email', 'short'));
+
+        self::assertResponseStatusCodeSame(422);
+        $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+
+        self::assertArrayHasKey('email', $response['errors']);
+        self::assertArrayHasKey('password', $response['errors']);
+    }
+
+    public function testRegisterRejectsMalformedJson(): void
+    {
+        $this->post('/api/register', '{"email":');
+
+        self::assertResponseStatusCodeSame(400);
+    }
+
+    public static function incompletePayloads(): iterable
+    {
+        yield 'password key absent' => ['{"email":"user@domain.pl"}', ['password']];
+        yield 'email key absent' => ['{"password":"pass1234"}', ['email']];
+        yield 'empty object' => ['{}', ['email', 'password']];
+    }
+
+    #[DataProvider('incompletePayloads')]
+    public function testRegisterRejectsIncompletePayload(string $body, array $expectedInvalidFields): void
+    {
+        $this->post('/api/register', $body);
+
+        self::assertResponseStatusCodeSame(422);
+        $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+
+        self::assertEqualsCanonicalizing($expectedInvalidFields, array_keys($response['errors']));
+    }
+
+    public function testRegisterRejectsWhitespaceOnlyPassword(): void
+    {
+        $this->post('/api/register', $this->json(password: str_repeat(' ', 8)));
+
+        self::assertResponseStatusCodeSame(422);
+        $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        self::assertArrayHasKey('password', $response['errors']);
+    }
+
+    public function testRegisterTrimsSurroundingWhitespaceFromEmail(): void
+    {
+        $this->post('/api/register', $this->json(email: '  '.self::EMAIL.'  '));
+
+        self::assertResponseStatusCodeSame(201);
+        $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        self::assertSame(self::EMAIL, $response['email']);
+
+        $this->em->clear();
+        self::assertNotNull($this->em->getRepository(User::class)->findOneByEmail(self::EMAIL));
+    }
+
+    public function testRegisterTreatsPaddedEmailAsDuplicate(): void
+    {
+        $this->post('/api/register', $this->json());
+        self::assertResponseStatusCodeSame(201);
+
+        $this->post('/api/register', $this->json(email: '  '.self::EMAIL.'  '));
+        self::assertResponseStatusCodeSame(409);
+    }
+
+    public function testRegisterTreatsNullValuesAsMalformed(): void
+    {
+        $this->post('/api/register', '{"email":null,"password":null}');
+
+        self::assertResponseStatusCodeSame(400);
+    }
+
+    public function testRegisterIgnoresExtraFields(): void
+    {
+        $this->post('/api/register', json_encode([
+            'email' => self::EMAIL,
+            'password' => self::PASSWORD,
+            'role' => 'admin',
+            'id' => 999,
+        ], \JSON_THROW_ON_ERROR));
+
+        self::assertResponseStatusCodeSame(201);
+        $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        self::assertSame('customer', $response['role']);
+        self::assertNotSame(999, $response['id']);
+
+        $this->em->clear();
+        self::assertSame(UserRole::Customer, $this->em->getRepository(User::class)->findOneByEmail(self::EMAIL)->getRole());
+    }
+
+    public function testLoginReturnsUsableToken(): void
+    {
+        $this->post('/api/register', $this->json());
+        self::assertResponseStatusCodeSame(201);
+
+        $this->post('/api/login', $this->json());
+        self::assertResponseIsSuccessful();
+
+        $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        self::assertArrayHasKey('token', $response);
+
+        // signature and claims are verified through Lexik
+        $claims = static::getContainer()->get('lexik_jwt_authentication.jwt_manager')->parse($response['token']);
+
+        self::assertSame(self::EMAIL, $claims['username']);
+        self::assertContains('ROLE_CUSTOMER', $claims['roles']);
+        self::assertGreaterThan($claims['iat'], $claims['exp']);
+    }
+
+    public function testLoginRejectsWrongPassword(): void
+    {
+        $this->post('/api/register', $this->json());
+        self::assertResponseStatusCodeSame(201);
+
+        $this->post('/api/login', $this->json(password: 'wrong-password'));
+        self::assertResponseStatusCodeSame(401);
+    }
+
+    public function testLoginRejectsUnknownEmail(): void
+    {
+        $this->post('/api/login', $this->json('nobody@example.com'));
+
+        self::assertResponseStatusCodeSame(401);
+    }
+}

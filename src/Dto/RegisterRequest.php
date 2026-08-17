@@ -11,9 +11,29 @@ final class RegisterRequest
     #[Assert\NotBlank(message: 'Email is required.')]
     #[Assert\Email(message: 'Email is not valid.')]
     #[Assert\Length(max: 180)]
-    public string $email = '';
+    private string $email = '';
 
-    #[Assert\NotBlank(message: 'Password is required.')]
+    #[Assert\NotBlank(message: 'Password is required.', normalizer: 'trim')]
     #[Assert\Length(min: 8, max: 4096, minMessage: 'Password must be at least {{ limit }} characters.')]
-    public string $password = '';
+    private string $password = '';
+
+    public function setEmail(string $email): void
+    {
+        $this->email = trim($email);
+    }
+
+    public function getEmail(): string
+    {
+        return $this->email;
+    }
+
+    public function setPassword(string $password): void
+    {
+        $this->password = $password;
+    }
+
+    public function getPassword(): string
+    {
+        return $this->password;
+    }
 }
