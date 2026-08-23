@@ -9,6 +9,6 @@ enum UserRole: string
 
     public function toRoleName(): string
     {
-        return 'ROLE_' . strtoupper($this->value);
+        return 'ROLE_'.strtoupper($this->value);
     }
 }

@@ -46,7 +46,7 @@ final class AuthController extends AbstractController
             return $this->json(['errors' => $errors], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        if ($users->findOneByEmail($dto->getEmail()) !== null) {
+        if (null !== $users->findOneByEmail($dto->getEmail())) {
             return $this->json(['error' => 'Email already registered.'], Response::HTTP_CONFLICT);
         }
 
