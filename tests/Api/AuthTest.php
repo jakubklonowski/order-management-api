@@ -37,6 +37,12 @@ final class AuthTest extends WebTestCase
         return json_encode(['email' => $email, 'password' => $password], \JSON_THROW_ON_ERROR);
     }
 
+    private function assertUsersStored(int $expected): void
+    {
+        $this->em->clear();
+        self::assertCount($expected, $this->em->getRepository(User::class)->findAll());
+    }
+
     public function testRegisterCreatesUser(): void
     {
         $this->post('/api/register', $this->json());
@@ -74,6 +80,8 @@ final class AuthTest extends WebTestCase
 
         $this->post('/api/register', $this->json());
         self::assertResponseStatusCodeSame(409);
+
+        $this->assertUsersStored(1);
     }
 
     public function testRegisterRejectsInvalidPayload(): void
@@ -85,6 +93,7 @@ final class AuthTest extends WebTestCase
 
         self::assertArrayHasKey('email', $response['errors']);
         self::assertArrayHasKey('password', $response['errors']);
+        $this->assertUsersStored(0);
     }
 
     public function testRegisterRejectsMalformedJson(): void
@@ -92,6 +101,7 @@ final class AuthTest extends WebTestCase
         $this->post('/api/register', '{"email":');
 
         self::assertResponseStatusCodeSame(400);
+        $this->assertUsersStored(0);
     }
 
     public static function incompletePayloads(): iterable
@@ -110,6 +120,7 @@ final class AuthTest extends WebTestCase
         $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
 
         self::assertEqualsCanonicalizing($expectedInvalidFields, array_keys($response['errors']));
+        $this->assertUsersStored(0);
     }
 
     public function testRegisterRejectsWhitespaceOnlyPassword(): void
@@ -119,6 +130,7 @@ final class AuthTest extends WebTestCase
         self::assertResponseStatusCodeSame(422);
         $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
         self::assertArrayHasKey('password', $response['errors']);
+        $this->assertUsersStored(0);
     }
 
     public function testRegisterTrimsSurroundingWhitespaceFromEmail(): void
@@ -147,6 +159,7 @@ final class AuthTest extends WebTestCase
         $this->post('/api/register', '{"email":null,"password":null}');
 
         self::assertResponseStatusCodeSame(400);
+        $this->assertUsersStored(0);
     }
 
     public function testRegisterIgnoresExtraFields(): void
