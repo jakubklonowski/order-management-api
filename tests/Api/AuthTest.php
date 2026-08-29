@@ -81,6 +81,9 @@ final class AuthTest extends WebTestCase
         $this->post('/api/register', $this->json());
         self::assertResponseStatusCodeSame(409);
 
+        $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        self::assertSame(['email'], array_keys($response['errors']));
+
         $this->assertUsersStored(1);
     }
 
@@ -154,11 +157,14 @@ final class AuthTest extends WebTestCase
         self::assertResponseStatusCodeSame(409);
     }
 
-    public function testRegisterTreatsNullValuesAsMalformed(): void
+    public function testRegisterRejectsNullValues(): void
     {
         $this->post('/api/register', '{"email":null,"password":null}');
 
-        self::assertResponseStatusCodeSame(400);
+        self::assertResponseStatusCodeSame(422);
+        $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+
+        self::assertEqualsCanonicalizing(['email', 'password'], array_keys($response['errors']));
         $this->assertUsersStored(0);
     }
 

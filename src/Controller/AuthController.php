@@ -11,43 +11,22 @@ use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Serializer\SerializerInterface;
-use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 final class AuthController extends AbstractController
 {
     #[Route('/api/register', name: 'api_register', methods: ['POST'])]
     public function register(
-        Request $request,
-        SerializerInterface $serializer,
-        ValidatorInterface $validator,
+        #[MapRequestPayload] RegisterRequest $dto,
         UserPasswordHasherInterface $passwordHasher,
         UserRepository $users,
         EntityManagerInterface $em,
     ): JsonResponse {
-        try {
-            $dto = $serializer->deserialize($request->getContent(), RegisterRequest::class, 'json');
-        } catch (\Throwable) {
-            return $this->json(['error' => 'Malformed JSON body.'], Response::HTTP_BAD_REQUEST);
-        }
-
-        $violations = $validator->validate($dto);
-
-        if (\count($violations) > 0) {
-            $errors = [];
-            foreach ($violations as $violation) {
-                $errors[$violation->getPropertyPath()][] = $violation->getMessage();
-            }
-
-            return $this->json(['errors' => $errors], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
         if (null !== $users->findOneByEmail($dto->getEmail())) {
-            return $this->json(['error' => 'Email already registered.'], Response::HTTP_CONFLICT);
+            return $this->json(['errors' => ['email' => ['Email already registered.']]], Response::HTTP_CONFLICT);
         }
 
         $user = new User($dto->getEmail());
@@ -58,7 +37,7 @@ final class AuthController extends AbstractController
             $em->flush();
         } catch (UniqueConstraintViolationException) {
             // email uniqueness catch in case something happened between check and write
-            return $this->json(['error' => 'Email already registered.'], Response::HTTP_CONFLICT);
+            return $this->json(['errors' => ['email' => ['Email already registered.']]], Response::HTTP_CONFLICT);
         }
 
         return $this->json([
