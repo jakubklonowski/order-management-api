@@ -6,30 +6,18 @@ namespace App\Tests\Api;
 
 use App\Entity\User;
 use App\Enum\UserRole;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Tests\ApiTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
-use Symfony\Bundle\FrameworkBundle\KernelBrowser;
-use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
-final class AuthTest extends WebTestCase
+final class AuthTest extends ApiTestCase
 {
     private const EMAIL = 'user@domain.pl';
     private const PASSWORD = 'pass1234';
-    private KernelBrowser $client;
-    private EntityManagerInterface $em;
-
-    protected function setUp(): void
-    {
-        $this->client = static::createClient();
-        $this->em = static::getContainer()->get(EntityManagerInterface::class);
-
-        $this->em->getConnection()->executeStatement('DELETE FROM users');
-    }
 
     private function post(string $uri, string $body): void
     {
-        $this->client->request('POST', $uri, server: ['CONTENT_TYPE' => 'application/json'], content: $body);
+        $this->request('POST', $uri, $body);
     }
 
     private function json(string $email = self::EMAIL, string $password = self::PASSWORD): string

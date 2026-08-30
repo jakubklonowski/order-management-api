@@ -4,35 +4,23 @@ declare(strict_types=1);
 
 namespace App\Tests\Api;
 
-use Doctrine\ORM\EntityManagerInterface;
+use App\Tests\ApiTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
-use Symfony\Bundle\FrameworkBundle\KernelBrowser;
-use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
- * class for testing error reporting contract
+ * class for testing error reporting contract.
  */
-final class ErrorContractTest extends WebTestCase
+final class ErrorContractTest extends ApiTestCase
 {
     private const EMAIL = 'contract@domain.pl';
     private const PASSWORD = 'pass1234';
 
-    private KernelBrowser $client;
-    private EntityManagerInterface $em;
-
     protected function setUp(): void
     {
-        $this->client = static::createClient();
-        $this->em = static::getContainer()->get(EntityManagerInterface::class);
-        $this->em->getConnection()->executeStatement('DELETE FROM users');
+        parent::setUp();
 
         // every case starts with existing user so that duplicate test can reach 409
         $this->request('POST', '/api/register', self::registration());
-    }
-
-    private function request(string $method, string $uri, ?string $body): void
-    {
-        $this->client->request($method, $uri, server: ['CONTENT_TYPE' => 'application/json'], content: $body);
     }
 
     private static function registration(): string

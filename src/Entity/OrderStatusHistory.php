@@ -8,6 +8,7 @@ use App\Enum\OrderStatus;
 use App\Repository\OrderStatusHistoryRepository;
 use Doctrine\ORM\Mapping as ORM;
 
+// should only be created by Order
 #[ORM\Entity(repositoryClass: OrderStatusHistoryRepository::class)]
 #[ORM\Table(name: 'order_status_history')]
 class OrderStatusHistory

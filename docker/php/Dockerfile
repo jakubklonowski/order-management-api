@@ -13,6 +13,7 @@ RUN docker-php-ext-install -j"$(nproc)" \
         intl \
         zip \
         opcache \
+        bcmath \
     && pecl install redis \
     && docker-php-ext-enable redis
 

@@ -53,6 +53,8 @@ class Order
         $this->createdAt = new \DateTimeImmutable();
         $this->items = new ArrayCollection();
         $this->statusHistory = new ArrayCollection();
+
+        $this->statusHistory->add(new OrderStatusHistory($this, OrderStatus::Pending, $user));
     }
 
     public function getId(): ?int
@@ -70,9 +72,20 @@ class Order
         return $this->status;
     }
 
-    public function setStatus(OrderStatus $status): static
+    /**
+     * The only way to change order status.
+     * Checks if particular status change is legal and logs the change to OrderStatusHistory.
+     *
+     * @throws \DomainException when transition is not allowed
+     */
+    public function changeStatus(OrderStatus $to, ?User $by): static
     {
-        $this->status = $status;
+        if (!$this->status->canTransitionTo($to)) {
+            throw new \DomainException(sprintf('Cannot change order status from "%s" to "%s"', $this->status->value, $to->value));
+        }
+
+        $this->status = $to;
+        $this->statusHistory->add(new OrderStatusHistory($this, $to, $by));
 
         return $this;
     }
@@ -112,13 +125,12 @@ class Order
         return $this->items;
     }
 
-    public function addItem(OrderItem $item): static
+    public function addItem(Product $product, int $quantity, string $unitPrice): OrderItem
     {
-        if (!$this->items->contains($item)) {
-            $this->items->add($item);
-        }
+        $item = new OrderItem($this, $product, $quantity, $unitPrice);
+        $this->items->add($item);
 
-        return $this;
+        return $item;
     }
 
     /** @return Collection<int, OrderStatusHistory> */
