@@ -55,6 +55,12 @@ final class ErrorContractTest extends ApiTestCase
             self::assertIsList($messages);
             self::assertContainsOnlyString($messages);
             self::assertNotEmpty($messages);
+
+            foreach ($messages as $message) {
+                // fails in case project classes names have leaked in error message
+                self::assertStringNotContainsString('App\\', $message);
+                self::assertStringNotContainsString('Symfony\\', $message);
+            }
         }
     }
 }

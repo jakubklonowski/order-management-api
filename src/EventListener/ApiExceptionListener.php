@@ -36,7 +36,7 @@ final class ApiExceptionListener
         // mapping denormalization and constraint fails
         $errors = $previous instanceof ValidationFailedException
             ? $this->groupViolationsByProperty($previous)
-            : [self::GENERAL => [$exception->getMessage() ?: (Response::$statusTexts[$exception->getStatusCode()] ?? 'Error')]];
+            : [self::GENERAL => [Response::$statusTexts[$exception->getStatusCode()] ?? 'Error']];
 
         $event->setResponse(new JsonResponse(['errors' => $errors], $exception->getStatusCode(), $exception->getHeaders()));
     }
