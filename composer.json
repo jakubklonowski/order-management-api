@@ -1,4 +1,6 @@
 {
+    "name": "jakub-klonowski/order-management-api",
+    "description": "REST API for e-commerce order and inventory management, built with Symfony and Docker",
     "type": "project",
     "license": "proprietary",
     "minimum-stability": "stable",
