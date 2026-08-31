@@ -8,6 +8,7 @@ use App\Repository\CategoryRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Attribute\Groups;
 
 #[ORM\Entity(repositoryClass: CategoryRepository::class)]
 #[ORM\Table(name: 'categories')]
@@ -16,9 +17,11 @@ class Category
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['category:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
+    #[Groups(['category:read'])]
     private string $name;
 
     #[ORM\ManyToOne(targetEntity: self::class, inversedBy: 'children')]
@@ -55,6 +58,12 @@ class Category
     public function getParent(): ?self
     {
         return $this->parent;
+    }
+
+    #[Groups(['category:read'])]
+    public function getParentId(): ?int
+    {
+        return $this->parent?->getId();
     }
 
     public function setParent(?self $parent): static
