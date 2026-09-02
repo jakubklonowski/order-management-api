@@ -20,11 +20,20 @@ class ProductRepository extends ServiceEntityRepository
     }
 
     /**
-     * @return array{items: Product[], total: int}
+     * Returns one page of products ordered by id, with stock levels joined in.
+     *
+     * @param int     $page   1-based page number
+     * @param ?string $search product name to be included in LIKE clause
+     *
+     * @return array{items: Product[], total: int} total counts every match, not only the page
      */
     public function paginate(int $page, int $limit, ?int $categoryId, ?string $search): array
     {
+        // pagination built explicitly for Doctrine to use
+        // otherwise it would be N+1 queries instead of two
         $qb = $this->createQueryBuilder('p')
+            ->leftJoin('p.inventory', 'i')
+            ->addSelect('i')
             ->orderBy('p.id', 'ASC');
 
         if (null !== $categoryId) {
@@ -40,7 +49,8 @@ class ProductRepository extends ServiceEntityRepository
         $qb->setFirstResult(($page - 1) * $limit)
             ->setMaxResults($limit);
 
-        $paginator = new Paginator($qb, true);
+        // fetchJoinCollection not needed as this is one-to-one join relation
+        $paginator = new Paginator($qb, false);
 
         return [
             'items' => iterator_to_array($paginator->getIterator()),

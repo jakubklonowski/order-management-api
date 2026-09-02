@@ -14,6 +14,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 abstract class ApiTestCase extends WebTestCase
 {
+    use ClearsDatabase;
+
     protected KernelBrowser $client;
     protected EntityManagerInterface $em;
 
@@ -22,28 +24,7 @@ abstract class ApiTestCase extends WebTestCase
         $this->client = static::createClient();
         $this->em = static::getContainer()->get(EntityManagerInterface::class);
 
-        $this->clearDatabase();
-    }
-
-    // children tables are cleared first in case some tables are not set to ON DELETE CASCADE
-    protected function clearDatabase(): void
-    {
-        $connection = $this->em->getConnection();
-
-        foreach ([
-            'order_status_history',
-            'order_items',
-            'orders',
-            'inventory',
-            'products',
-            'categories',
-            'promo_codes',
-            'users',
-        ] as $table) {
-            $connection->executeStatement('DELETE FROM '.$table);
-        }
-
-        $this->em->clear();
+        $this->clearDatabase($this->em);
     }
 
     protected function request(string $method, string $uri, ?string $body = null, ?string $token = null): void

@@ -6,6 +6,7 @@ namespace App\Tests\Command;
 
 use App\Entity\User;
 use App\Enum\UserRole;
+use App\Tests\ClearsDatabase;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -15,6 +16,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class CreateAdminCommandTest extends KernelTestCase
 {
+    use ClearsDatabase;
+
     private const EMAIL = 'admin@domain.pl';
     private const PASSWORD = 'pass1234';
 
@@ -25,7 +28,7 @@ final class CreateAdminCommandTest extends KernelTestCase
     {
         self::bootKernel();
         $this->em = static::getContainer()->get(EntityManagerInterface::class);
-        $this->em->getConnection()->executeStatement('DELETE FROM users');
+        $this->clearDatabase($this->em);
 
         $this->tester = new CommandTester(
             (new Application(static::$kernel))->find('app:create-admin')
