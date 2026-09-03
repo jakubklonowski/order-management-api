@@ -6,6 +6,7 @@ namespace App\Entity;
 
 use App\Repository\InventoryRepository;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Attribute\Groups;
 
 #[ORM\Entity(repositoryClass: InventoryRepository::class)]
 #[ORM\Table(name: 'inventory')]
@@ -21,12 +22,15 @@ class Inventory
     private Product $product;
 
     #[ORM\Column]
+    #[Groups(['inventory:read'])]
     private int $quantity;
 
     #[ORM\Column]
+    #[Groups(['inventory:read'])]
     private int $reservedQuantity = 0;
 
     #[ORM\Column]
+    #[Groups(['inventory:read'])]
     private int $lowStockThreshold;
 
     public function __construct(Product $product, int $quantity, int $lowStockThreshold)
@@ -48,6 +52,12 @@ class Inventory
     public function getProduct(): Product
     {
         return $this->product;
+    }
+
+    #[Groups(['inventory:read'])]
+    public function getProductId(): ?int
+    {
+        return $this->product->getId();
     }
 
     public function getQuantity(): int
@@ -86,6 +96,7 @@ class Inventory
         return $this;
     }
 
+    #[Groups(['inventory:read'])]
     public function getAvailableQuantity(): int
     {
         return $this->quantity - $this->reservedQuantity;
@@ -105,6 +116,7 @@ class Inventory
         $this->reservedQuantity = max(0, $this->reservedQuantity - $amount);
     }
 
+    #[Groups(['inventory:read'])]
     public function isLowStock(): bool
     {
         return $this->getAvailableQuantity() <= $this->lowStockThreshold;
