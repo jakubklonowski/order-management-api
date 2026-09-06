@@ -7,6 +7,7 @@ namespace App\Entity;
 use App\Enum\OrderStatus;
 use App\Repository\OrderStatusHistoryRepository;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Attribute\Groups;
 
 // should only be created by Order
 #[ORM\Entity(repositoryClass: OrderStatusHistoryRepository::class)]
@@ -50,11 +51,13 @@ class OrderStatusHistory
         return $this->order;
     }
 
+    #[Groups(['order:history'])]
     public function getStatus(): OrderStatus
     {
         return $this->status;
     }
 
+    #[Groups(['order:history'])]
     public function getChangedAt(): \DateTimeImmutable
     {
         return $this->changedAt;
@@ -63,5 +66,12 @@ class OrderStatusHistory
     public function getChangedBy(): ?User
     {
         return $this->changedBy;
+    }
+
+    // is null when account behind the change is deleted (relation is SET NULL)
+    #[Groups(['order:history'])]
+    public function getChangedById(): ?int
+    {
+        return $this->changedBy?->getId();
     }
 }

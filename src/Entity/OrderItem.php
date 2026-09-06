@@ -6,6 +6,7 @@ namespace App\Entity;
 
 use App\Repository\OrderItemRepository;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Attribute\Groups;
 
 // should only be created by Order
 #[ORM\Entity(repositoryClass: OrderItemRepository::class)]
@@ -26,9 +27,11 @@ class OrderItem
     private Product $product;
 
     #[ORM\Column]
+    #[Groups(['order:read'])]
     private int $quantity;
 
     #[ORM\Column(type: 'decimal', precision: 10, scale: 2)]
+    #[Groups(['order:read'])]
     private string $unitPrice;
 
     public function __construct(Order $order, Product $product, int $quantity, string $unitPrice)
@@ -52,6 +55,12 @@ class OrderItem
     public function getProduct(): Product
     {
         return $this->product;
+    }
+
+    #[Groups(['order:read'])]
+    public function getProductId(): ?int
+    {
+        return $this->product->getId();
     }
 
     public function getQuantity(): int

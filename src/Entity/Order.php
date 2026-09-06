@@ -9,6 +9,7 @@ use App\Repository\OrderRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Attribute\Groups;
 
 #[ORM\Entity(repositoryClass: OrderRepository::class)]
 #[ORM\Table(name: 'orders')]
@@ -17,6 +18,7 @@ class Order
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['order:list', 'order:read'])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: User::class)]
@@ -24,9 +26,11 @@ class Order
     private User $user;
 
     #[ORM\Column(length: 20, enumType: OrderStatus::class)]
+    #[Groups(['order:list', 'order:read'])]
     private OrderStatus $status;
 
     #[ORM\Column(type: 'decimal', precision: 10, scale: 2)]
+    #[Groups(['order:list', 'order:read'])]
     private string $totalPrice;
 
     #[ORM\ManyToOne(targetEntity: PromoCode::class)]
@@ -34,10 +38,12 @@ class Order
     private ?PromoCode $promoCode = null;
 
     #[ORM\Column]
+    #[Groups(['order:list', 'order:read'])]
     private \DateTimeImmutable $createdAt;
 
     /** @var Collection<int, OrderItem> */
     #[ORM\OneToMany(mappedBy: 'order', targetEntity: OrderItem::class, cascade: ['persist'], orphanRemoval: true)]
+    #[Groups(['order:read'])]
     private Collection $items;
 
     /** @var Collection<int, OrderStatusHistory> */
@@ -65,6 +71,12 @@ class Order
     public function getUser(): User
     {
         return $this->user;
+    }
+
+    #[Groups(['order:list', 'order:read'])]
+    public function getUserId(): ?int
+    {
+        return $this->user->getId();
     }
 
     public function getStatus(): OrderStatus
