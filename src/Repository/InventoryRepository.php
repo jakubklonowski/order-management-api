@@ -42,4 +42,32 @@ class InventoryRepository extends ServiceEntityRepository
 
         return $query->getOneOrNullResult();
     }
+
+    /**
+     * Locks and returns the Inventory rows for several products at once.
+     *
+     * Sorting used as deadlock prevention. Rows are locked one statement at a
+     * time because a single WHERE product_id IN (...) would leave the locking
+     * order to the query planner.
+     *
+     * @param list<int> $productIds
+     *
+     * @return array<int, Inventory> keyed by product id, missing rows omitted
+     */
+    public function findAllByProductIdsForUpdate(array $productIds): array
+    {
+        sort($productIds);
+
+        $locked = [];
+
+        foreach ($productIds as $productId) {
+            $inventory = $this->findOneByProductIdForUpdate($productId);
+
+            if (null !== $inventory) {
+                $locked[$productId] = $inventory;
+            }
+        }
+
+        return $locked;
+    }
 }

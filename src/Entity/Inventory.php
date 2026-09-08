@@ -116,6 +116,21 @@ class Inventory
         $this->reservedQuantity = max(0, $this->reservedQuantity - $amount);
     }
 
+    // the only thing that lowers quantity
+    public function ship(int $amount): void
+    {
+        if ($amount > $this->reservedQuantity) {
+            throw new \DomainException('Cannot ship more than is reserved.');
+        }
+
+        if ($amount > $this->quantity) {
+            throw new \DomainException('Cannot ship more than is in stock.');
+        }
+
+        $this->quantity -= $amount;
+        $this->reservedQuantity -= $amount;
+    }
+
     #[Groups(['inventory:read'])]
     public function isLowStock(): bool
     {

@@ -16,14 +16,15 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 final class OrderVoter extends Voter
 {
     public const VIEW = 'ORDER_VIEW';
+    public const CANCEL = 'ORDER_CANCEL';
 
     protected function supports(string $attribute, mixed $subject): bool
     {
-        return (self::VIEW === $attribute) && ($subject instanceof Order);
+        return \in_array($attribute, [self::VIEW, self::CANCEL], true) && ($subject instanceof Order);
     }
 
-    // $attribute not used as long as there's only one $attribute to
-    // check and it was already checked in supports()
+    // $attribute is not read - both permissions are handled the same way
+    // today and supports() already rejected anything else
     protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token): bool
     {
         $user = $token->getUser();

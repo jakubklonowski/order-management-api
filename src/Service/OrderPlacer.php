@@ -32,11 +32,6 @@ final class OrderPlacer
     {
         $orderPositions = $this->mergeByProduct($orderLines);
 
-        // sorts order positions by product ID
-        // this should prevent deadlock occurring when two carts with
-        // the same products in different order blocks each other
-        ksort($orderPositions);
-
         return $this->em->wrapInTransaction(fn (): Order => $this->buildOrder($user, $orderPositions));
     }
 
@@ -62,11 +57,13 @@ final class OrderPlacer
      */
     private function buildOrder(User $user, array $orderPositions): Order
     {
+        $inventories = $this->inventories->findAllByProductIdsForUpdate(array_keys($orderPositions));
+
         $order = new Order($user);
         $total = '0.00';
 
         foreach ($orderPositions as $productId => $quantity) {
-            $inventory = $this->inventories->findOneByProductIdForUpdate($productId);
+            $inventory = $inventories[$productId] ?? null;
 
             // product with no stock cant be sold
             if (null === $inventory) {

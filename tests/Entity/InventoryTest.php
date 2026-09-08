@@ -55,6 +55,57 @@ final class InventoryTest extends TestCase
         self::assertSame(0, $inventory->getReservedQuantity());
     }
 
+    public function testShipConsumesReservedStock(): void
+    {
+        $inventory = $this->inventory(quantity: 10);
+        $inventory->reserve(4);
+
+        $inventory->ship(4);
+
+        self::assertSame(6, $inventory->getQuantity());
+        self::assertSame(0, $inventory->getReservedQuantity());
+        self::assertSame(6, $inventory->getAvailableQuantity());
+    }
+
+    public function testShipRejectsMoreThanReserved(): void
+    {
+        $inventory = $this->inventory(quantity: 10);
+        $inventory->reserve(2);
+
+        try {
+            $inventory->ship(3);
+            self::fail('Expected DomainException');
+        } catch (\DomainException) {
+            self::assertSame(10, $inventory->getQuantity());
+            self::assertSame(2, $inventory->getReservedQuantity());
+        }
+    }
+
+    public function testShipRefusesToDriveQuantityNegative(): void
+    {
+        $inventory = $this->inventory(quantity: 10);
+        $inventory->reserve(5);
+        // reachable only by racing the admin stock endpoint against a reservation
+        $inventory->setQuantity(1);
+
+        try {
+            $inventory->ship(5);
+            self::fail('Expected DomainException');
+        } catch (\DomainException) {
+            self::assertSame(1, $inventory->getQuantity());
+        }
+    }
+
+    public function testShipLeavesUnreservedStockAlone(): void
+    {
+        $inventory = $this->inventory(quantity: 10);
+        $inventory->reserve(3);
+
+        $inventory->ship(3);
+
+        self::assertSame(7, $inventory->getAvailableQuantity());
+    }
+
     public function testLowStockUsesAvailableNotRawQuantity(): void
     {
         $inventory = $this->inventory(quantity: 10, threshold: 3);
