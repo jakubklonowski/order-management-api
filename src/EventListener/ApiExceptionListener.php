@@ -11,7 +11,10 @@ use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\Validator\Exception\ValidationFailedException;
 
-#[AsEventListener]
+// priority -64 makes it run after both Symfony logs the exception and after profiler captures it
+// because setting response here stops the event;
+// runs before -128 listener that would render HTML
+#[AsEventListener(priority: -64)]
 final class ApiExceptionListener
 {
     // key for errors that belong to no particular field
@@ -26,19 +29,20 @@ final class ApiExceptionListener
 
         $exception = $event->getThrowable();
 
-        // checks if it's http exception, returns otherwise
-        if (!$exception instanceof HttpExceptionInterface) {
-            return;
-        }
+        // anything that's not HTTP exception is not a rejected request but a bug
+        $status = $exception instanceof HttpExceptionInterface
+            ? $exception->getStatusCode()
+            : Response::HTTP_INTERNAL_SERVER_ERROR;
+        $headers = $exception instanceof HttpExceptionInterface ? $exception->getHeaders() : [];
 
         $previous = $exception->getPrevious();
 
         // mapping denormalization and constraint fails
         $errors = $previous instanceof ValidationFailedException
             ? $this->groupViolationsByProperty($previous)
-            : [self::GENERAL => [Response::$statusTexts[$exception->getStatusCode()] ?? 'Error']];
+            : [self::GENERAL => [Response::$statusTexts[$status] ?? 'Error']];
 
-        $event->setResponse(new JsonResponse(['errors' => $errors], $exception->getStatusCode(), $exception->getHeaders()));
+        $event->setResponse(new JsonResponse(['errors' => $errors], $status, $headers));
     }
 
     /**

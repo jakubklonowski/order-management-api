@@ -34,6 +34,9 @@ final class ErrorContractTest extends ApiTestCase
     public static function failingRequests(): iterable
     {
         yield 'malformed json' => ['POST', '/api/register', '{"email":', 400];
+        // Lexik answers this one straight from the firewall, never as an exception
+        yield 'missing token' => ['GET', '/api/categories', null, 401];
+        yield 'rejected credentials' => ['POST', '/api/login', '{"email":"nobody@domain.pl","password":"nope"}', 401];
         yield 'unknown route' => ['GET', '/api/nope', null, 404];
         yield 'wrong method' => ['GET', '/api/register', null, 405];
         yield 'duplicate email' => ['POST', '/api/register', self::registration(), 409];
