@@ -75,7 +75,8 @@ final class InventoryTest extends TestCase
         try {
             $inventory->ship(3);
             self::fail('Expected DomainException');
-        } catch (\DomainException) {
+        } catch (\DomainException $exception) {
+            self::assertSame('Cannot ship more than is reserved.', $exception->getMessage());
             self::assertSame(10, $inventory->getQuantity());
             self::assertSame(2, $inventory->getReservedQuantity());
         }
@@ -91,7 +92,9 @@ final class InventoryTest extends TestCase
         try {
             $inventory->ship(5);
             self::fail('Expected DomainException');
-        } catch (\DomainException) {
+        } catch (\DomainException $exception) {
+            // message tells which ship() guard threw
+            self::assertSame('Cannot ship more than is in stock.', $exception->getMessage());
             self::assertSame(1, $inventory->getQuantity());
         }
     }

@@ -17,6 +17,7 @@ final class OrderStatusTest extends ApiTestCase
 {
     private User $customer;
     private string $customerToken;
+    private User $admin;
     private string $adminToken;
     private Product $product;
 
@@ -26,7 +27,8 @@ final class OrderStatusTest extends ApiTestCase
 
         $this->customer = $this->createUser('customer@domain.pl');
         $this->customerToken = $this->tokenFor($this->customer);
-        $this->adminToken = $this->tokenForNewUser('admin@domain.pl', UserRole::Admin);
+        $this->admin = $this->createUser('admin@domain.pl', UserRole::Admin);
+        $this->adminToken = $this->tokenFor($this->admin);
 
         $category = new Category('Tools');
         $this->em->persist($category);
@@ -113,6 +115,23 @@ final class OrderStatusTest extends ApiTestCase
         self::assertSame(OrderStatus::Pending->value, $history[0]['status']);
         self::assertSame(OrderStatus::Cancelled->value, $history[1]['status']);
         self::assertSame($this->customer->getId(), $history[1]['changedById']);
+    }
+
+    // customer creates order, admin changes its status
+    // history should list both correctly
+    public function testHistoryCreditsTheAdminWhoChangedTheStatus(): void
+    {
+        $orderId = $this->placeOrder();
+
+        $this->setStatus($orderId, OrderStatus::Confirmed->value);
+        self::assertResponseIsSuccessful();
+
+        $this->request('GET', '/api/orders/'.$orderId.'/history', token: $this->customerToken);
+        $history = $this->responseBody();
+
+        self::assertSame($this->customer->getId(), $history[0]['changedById']);
+        self::assertSame(OrderStatus::Confirmed->value, $history[1]['status']);
+        self::assertSame($this->admin->getId(), $history[1]['changedById']);
     }
 
     public function testCustomerCannotCancelAnotherCustomersOrder(): void

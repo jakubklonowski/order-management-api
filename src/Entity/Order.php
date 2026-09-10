@@ -48,7 +48,7 @@ class Order
 
     /** @var Collection<int, OrderStatusHistory> */
     #[ORM\OneToMany(mappedBy: 'order', targetEntity: OrderStatusHistory::class, cascade: ['persist'], orphanRemoval: true)]
-    #[ORM\OrderBy(['changedAt' => 'ASC'])]
+    #[ORM\OrderBy(['changedAt' => 'ASC', 'id' => 'ASC'])]
     private Collection $statusHistory;
 
     public function __construct(User $user)
