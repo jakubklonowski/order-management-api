@@ -72,10 +72,4 @@ class Category
 
         return $this;
     }
-
-    /** @return Collection<int, self> */
-    public function getChildren(): Collection
-    {
-        return $this->children;
-    }
 }

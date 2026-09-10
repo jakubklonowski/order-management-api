@@ -193,6 +193,28 @@ final class AuthTest extends ApiTestCase
         self::assertGreaterThan($claims['iat'], $claims['exp']);
     }
 
+    public function testLoginUpgradesAnOutdatedPasswordHash(): void
+    {
+        $user = new User(self::EMAIL, UserRole::Customer);
+        $user->setPassword(password_hash(self::PASSWORD, \PASSWORD_BCRYPT, ['cost' => 6]));
+        $this->em->persist($user);
+        $this->em->flush();
+        $stale = $user->getPassword();
+
+        $this->post('/api/login', $this->json());
+        self::assertResponseIsSuccessful();
+
+        $this->em->clear();
+        $stored = $this->em->getRepository(User::class)->findOneByEmail(self::EMAIL);
+
+        self::assertNotSame($stale, $stored->getPassword());
+        // upgrade must not invalidate credential it rehashed
+        self::assertTrue(
+            static::getContainer()->get(UserPasswordHasherInterface::class)
+                ->isPasswordValid($stored, self::PASSWORD)
+        );
+    }
+
     public function testLoginRejectsWrongPassword(): void
     {
         $this->post('/api/register', $this->json());

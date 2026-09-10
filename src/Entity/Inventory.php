@@ -77,13 +77,6 @@ class Inventory
         return $this->reservedQuantity;
     }
 
-    public function setReservedQuantity(int $reservedQuantity): static
-    {
-        $this->reservedQuantity = $reservedQuantity;
-
-        return $this;
-    }
-
     public function getLowStockThreshold(): int
     {
         return $this->lowStockThreshold;
