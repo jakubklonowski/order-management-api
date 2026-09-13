@@ -1,4 +1,5 @@
 # Order & Inventory Management API
+[![CI](https://github.com/jakubklonowski/order-management-api/actions/workflows/ci.yml/badge.svg)](https://github.com/jakubklonowski/order-management-api/actions/workflows/ci.yml)
 
 A REST API for e-commerce order and inventory management.
 
@@ -281,7 +282,7 @@ drift itself is still reachable. Order placement, where it actually matters, doe
 
 ## Further development
 
-- **PHPStan and CI** for static analysis and test enforcement
+- **PHPStan** for static analysis
 - **Infection**, to automate the by-hand mutation checks described under Tests
 - **OpenAPI documentation**, generated from the controllers and DTOs
 - **Seed data**, so a fresh setup has categories, products and stock to try the API against without creating them by hand first
