@@ -52,7 +52,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function getUserIdentifier(): string
     {
-        return $this->email;
+        // empty string check because getUserIdentifier is declared in UserInterface where
+        // its PHPDoc declares return type as non-empty-string
+        return '' !== $this->email ? $this->email : throw new \LogicException('User has no email.');
     }
 
     public function setEmail(string $email): static

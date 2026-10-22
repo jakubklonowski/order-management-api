@@ -36,7 +36,7 @@ final class AuthTest extends ApiTestCase
         $this->post('/api/register', $this->json());
 
         self::assertResponseStatusCodeSame(201);
-        $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        $response = $this->responseBody();
 
         // in case of controller changes makes password leak
         self::assertEqualsCanonicalizing(['id', 'email', 'role'], array_keys($response));
@@ -69,7 +69,7 @@ final class AuthTest extends ApiTestCase
         $this->post('/api/register', $this->json());
         self::assertResponseStatusCodeSame(409);
 
-        $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        $response = $this->responseBody();
         self::assertSame(['email'], array_keys($response['errors']));
 
         $this->assertUsersStored(1);
@@ -80,7 +80,7 @@ final class AuthTest extends ApiTestCase
         $this->post('/api/register', $this->json('not-an-email', 'short'));
 
         self::assertResponseStatusCodeSame(422);
-        $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        $response = $this->responseBody();
 
         self::assertArrayHasKey('email', $response['errors']);
         self::assertArrayHasKey('password', $response['errors']);
@@ -95,6 +95,9 @@ final class AuthTest extends ApiTestCase
         $this->assertUsersStored(0);
     }
 
+    /**
+     * @return iterable<string, array{string, list<string>}>
+     */
     public static function incompletePayloads(): iterable
     {
         yield 'password key absent' => ['{"email":"user@domain.pl"}', ['password']];
@@ -102,13 +105,16 @@ final class AuthTest extends ApiTestCase
         yield 'empty object' => ['{}', ['email', 'password']];
     }
 
+    /**
+     * @param list<string> $expectedInvalidFields
+     */
     #[DataProvider('incompletePayloads')]
     public function testRegisterRejectsIncompletePayload(string $body, array $expectedInvalidFields): void
     {
         $this->post('/api/register', $body);
 
         self::assertResponseStatusCodeSame(422);
-        $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        $response = $this->responseBody();
 
         self::assertEqualsCanonicalizing($expectedInvalidFields, array_keys($response['errors']));
         $this->assertUsersStored(0);
@@ -119,7 +125,7 @@ final class AuthTest extends ApiTestCase
         $this->post('/api/register', $this->json(password: str_repeat(' ', 8)));
 
         self::assertResponseStatusCodeSame(422);
-        $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        $response = $this->responseBody();
         self::assertArrayHasKey('password', $response['errors']);
         $this->assertUsersStored(0);
     }
@@ -129,7 +135,7 @@ final class AuthTest extends ApiTestCase
         $this->post('/api/register', $this->json(email: '  '.self::EMAIL.'  '));
 
         self::assertResponseStatusCodeSame(201);
-        $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        $response = $this->responseBody();
         self::assertSame(self::EMAIL, $response['email']);
 
         $this->em->clear();
@@ -150,7 +156,7 @@ final class AuthTest extends ApiTestCase
         $this->post('/api/register', '{"email":null,"password":null}');
 
         self::assertResponseStatusCodeSame(422);
-        $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        $response = $this->responseBody();
 
         self::assertEqualsCanonicalizing(['email', 'password'], array_keys($response['errors']));
         $this->assertUsersStored(0);
@@ -166,12 +172,15 @@ final class AuthTest extends ApiTestCase
         ], \JSON_THROW_ON_ERROR));
 
         self::assertResponseStatusCodeSame(201);
-        $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        $response = $this->responseBody();
         self::assertSame('customer', $response['role']);
         self::assertNotSame(999, $response['id']);
 
         $this->em->clear();
-        self::assertSame(UserRole::Customer, $this->em->getRepository(User::class)->findOneByEmail(self::EMAIL)->getRole());
+        $stored = $this->em->getRepository(User::class)->findOneByEmail(self::EMAIL);
+
+        self::assertNotNull($stored);
+        self::assertSame(UserRole::Customer, $stored->getRole());
     }
 
     public function testLoginReturnsUsableToken(): void
@@ -182,7 +191,7 @@ final class AuthTest extends ApiTestCase
         $this->post('/api/login', $this->json());
         self::assertResponseIsSuccessful();
 
-        $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        $response = $this->responseBody();
         self::assertArrayHasKey('token', $response);
 
         // signature and claims are verified through Lexik
@@ -207,6 +216,7 @@ final class AuthTest extends ApiTestCase
         $this->em->clear();
         $stored = $this->em->getRepository(User::class)->findOneByEmail(self::EMAIL);
 
+        self::assertNotNull($stored);
         self::assertNotSame($stale, $stored->getPassword());
         // upgrade must not invalidate credential it rehashed
         self::assertTrue(

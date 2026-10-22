@@ -19,8 +19,8 @@ final class OrderStatusRequest
         $this->status = $status;
     }
 
-    public function getStatus(): ?OrderStatus
+    public function getStatus(): OrderStatus
     {
-        return $this->status;
+        return $this->status ?? throw new \LogicException('Status read before validation.');
     }
 }

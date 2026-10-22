@@ -23,9 +23,9 @@ final class OrderItemRequest
         $this->productId = $productId;
     }
 
-    public function getProductId(): ?int
+    public function getProductId(): int
     {
-        return $this->productId;
+        return $this->productId ?? throw new \LogicException('Product ID read before validation.');
     }
 
     public function setQuantity(?int $quantity): void
@@ -33,8 +33,8 @@ final class OrderItemRequest
         $this->quantity = $quantity;
     }
 
-    public function getQuantity(): ?int
+    public function getQuantity(): int
     {
-        return $this->quantity;
+        return $this->quantity ?? throw new \LogicException('Quantity read before validation.');
     }
 }

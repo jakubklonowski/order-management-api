@@ -31,12 +31,29 @@ final class ApiExceptionListenerTest extends TestCase
         return $event;
     }
 
+    // Event's response is null until set
+    private function getResponseOfEvent(ExceptionEvent $event): Response
+    {
+        $response = $event->getResponse();
+        self::assertNotNull($response);
+
+        return $response;
+    }
+
+    private function getResponseContentOfEvent(ExceptionEvent $event): string
+    {
+        $content = $this->getResponseOfEvent($event)->getContent();
+        self::assertIsString($content);
+
+        return $content;
+    }
+
     /**
      * @return array<mixed>
      */
     private function getResponseBodyOfEvent(ExceptionEvent $event): array
     {
-        return json_decode($event->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        return json_decode($this->getResponseContentOfEvent($event), true, flags: \JSON_THROW_ON_ERROR);
     }
 
     public function testUnexpectedThrowableBecomesJsonServerError(): void
@@ -52,14 +69,14 @@ final class ApiExceptionListenerTest extends TestCase
     {
         $event = $this->dispatch('/api/orders', new \RuntimeException(self::LEAKY_MESSAGE));
 
-        self::assertStringNotContainsString(self::LEAKY_MESSAGE, $event->getResponse()->getContent());
+        self::assertStringNotContainsString(self::LEAKY_MESSAGE, $this->getResponseContentOfEvent($event));
     }
 
     public function testHttpExceptionKeepsItsOwnStatusAndShape(): void
     {
         $event = $this->dispatch('/api/orders/1', new NotFoundHttpException(self::LEAKY_MESSAGE));
 
-        self::assertSame(Response::HTTP_NOT_FOUND, $event->getResponse()->getStatusCode());
+        self::assertSame(Response::HTTP_NOT_FOUND, $this->getResponseOfEvent($event)->getStatusCode());
         self::assertSame(['errors' => ['_' => ['Not Found']]], $this->getResponseBodyOfEvent($event));
     }
 

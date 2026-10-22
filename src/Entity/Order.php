@@ -29,6 +29,7 @@ class Order
     #[Groups(['order:list', 'order:read'])]
     private OrderStatus $status;
 
+    /** @var numeric-string */
     #[ORM\Column(type: 'decimal', precision: 10, scale: 2)]
     #[Groups(['order:list', 'order:read'])]
     private string $totalPrice;
@@ -102,11 +103,13 @@ class Order
         return $this;
     }
 
+    /** @return numeric-string */
     public function getTotalPrice(): string
     {
         return $this->totalPrice;
     }
 
+    /** @param numeric-string $totalPrice */
     public function setTotalPrice(string $totalPrice): static
     {
         $this->totalPrice = $totalPrice;
@@ -137,6 +140,7 @@ class Order
         return $this->items;
     }
 
+    /** @param numeric-string $unitPrice */
     public function addItem(Product $product, int $quantity, string $unitPrice): OrderItem
     {
         $item = new OrderItem($this, $product, $quantity, $unitPrice);

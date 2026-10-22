@@ -25,7 +25,10 @@ final class OrderTest extends TestCase
 
         self::assertSame(OrderStatus::Pending, $order->getStatus());
         self::assertCount(1, $order->getStatusHistory());
-        self::assertSame(OrderStatus::Pending, $order->getStatusHistory()->first()->getStatus());
+
+        $first = $order->getStatusHistory()->first();
+        self::assertNotFalse($first);
+        self::assertSame(OrderStatus::Pending, $first->getStatus());
     }
 
     public function testChangeStatusRecordsWhatChangedAndWhoDidIt(): void
@@ -39,6 +42,7 @@ final class OrderTest extends TestCase
         self::assertCount(2, $order->getStatusHistory());
 
         $latest = $order->getStatusHistory()->last();
+        self::assertNotFalse($latest);
         self::assertSame(OrderStatus::Confirmed, $latest->getStatus());
         self::assertSame($admin, $latest->getChangedBy());
     }

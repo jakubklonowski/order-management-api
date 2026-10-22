@@ -36,6 +36,7 @@ final class ProductTest extends ApiTestCase
         return $category;
     }
 
+    /** @param numeric-string $price */
     private function product(string $name, string $sku, ?Category $category = null, string $price = '19.99'): Product
     {
         $product = new Product($name, $price, $sku, $category ?? $this->category);
@@ -77,8 +78,11 @@ final class ProductTest extends ApiTestCase
     }
 
     // clears cache so test is forced to assert data against database
-    private function reload(int $id): Product
+    private function reload(?int $id): Product
     {
+        // getId() is null for an entity that was never flushed
+        self::assertNotNull($id);
+
         $this->em->clear();
         $product = $this->em->getRepository(Product::class)->find($id);
 

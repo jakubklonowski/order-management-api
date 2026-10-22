@@ -61,6 +61,9 @@ jobs:
       - name: Check code style
         run: vendor/bin/php-cs-fixer fix --dry-run --diff
 
+      - name: Static analysis
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+
       - name: Create and migrate the test database
         run: |
           php bin/console doctrine:database:create --if-not-exists

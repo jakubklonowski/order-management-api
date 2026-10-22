@@ -30,10 +30,12 @@ class OrderItem
     #[Groups(['order:read'])]
     private int $quantity;
 
+    /** @var numeric-string */
     #[ORM\Column(type: 'decimal', precision: 10, scale: 2)]
     #[Groups(['order:read'])]
     private string $unitPrice;
 
+    /** @param numeric-string $unitPrice */
     public function __construct(Order $order, Product $product, int $quantity, string $unitPrice)
     {
         $this->order = $order;
@@ -68,6 +70,7 @@ class OrderItem
         return $this->quantity;
     }
 
+    /** @return numeric-string */
     public function getUnitPrice(): string
     {
         return $this->unitPrice;

@@ -23,6 +23,7 @@ class PromoCode
     #[ORM\Column(length: 20, enumType: PromoCodeType::class)]
     private PromoCodeType $type;
 
+    /** @var numeric-string */
     #[ORM\Column(type: 'decimal', precision: 10, scale: 2)]
     private string $value;
 
@@ -35,6 +36,7 @@ class PromoCode
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $expiresAt = null;
 
+    /** @param numeric-string $value */
     public function __construct(string $code, PromoCodeType $type, string $value, int $maxUses, ?\DateTimeImmutable $expiresAt = null)
     {
         $this->code = strtoupper($code);
@@ -59,6 +61,7 @@ class PromoCode
         return $this->type;
     }
 
+    /** @return numeric-string */
     public function getValue(): string
     {
         return $this->value;

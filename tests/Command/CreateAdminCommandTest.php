@@ -26,12 +26,12 @@ final class CreateAdminCommandTest extends KernelTestCase
 
     protected function setUp(): void
     {
-        self::bootKernel();
+        $kernel = self::bootKernel();
         $this->em = static::getContainer()->get(EntityManagerInterface::class);
         $this->clearDatabase($this->em);
 
         $this->tester = new CommandTester(
-            (new Application(static::$kernel))->find('app:create-admin')
+            (new Application($kernel))->find('app:create-admin')
         );
     }
 
@@ -67,6 +67,7 @@ final class CreateAdminCommandTest extends KernelTestCase
         $this->em->clear();
         $user = $this->em->getRepository(User::class)->findOneByEmail(self::EMAIL);
 
+        self::assertNotNull($user);
         self::assertStringStartsWith('$', $user->getPassword());
         $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
         self::assertTrue($hasher->isPasswordValid($user, self::PASSWORD));

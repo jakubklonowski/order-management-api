@@ -26,6 +26,7 @@ class Product
     #[Groups(['product:read'])]
     private ?string $description = null;
 
+    /** @var numeric-string */
     #[ORM\Column(type: 'decimal', precision: 10, scale: 2)]
     #[Groups(['product:list', 'product:read'])]
     private string $price;
@@ -45,6 +46,7 @@ class Product
     #[ORM\OneToOne(mappedBy: 'product', targetEntity: Inventory::class, cascade: ['persist', 'remove'])]
     private ?Inventory $inventory = null;
 
+    /** @param numeric-string $price */
     public function __construct(string $name, string $price, string $sku, Category $category)
     {
         $this->name = $name;
@@ -83,11 +85,13 @@ class Product
         return $this;
     }
 
+    /** @return numeric-string */
     public function getPrice(): string
     {
         return $this->price;
     }
 
+    /** @param numeric-string $price */
     public function setPrice(string $price): static
     {
         $this->price = $price;

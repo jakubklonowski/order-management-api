@@ -22,19 +22,31 @@ final class JwtFailureListenerTest extends TestCase
         return $event;
     }
 
+    // Event's response is null until set
+    private function getResponseOfEvent(AuthenticationFailureEvent $event): Response
+    {
+        $response = $event->getResponse();
+        self::assertNotNull($response);
+
+        return $response;
+    }
+
     /**
      * @return array<mixed>
      */
     private function getResponseBodyOfEvent(AuthenticationFailureEvent $event): array
     {
-        return json_decode($event->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        $content = $this->getResponseOfEvent($event)->getContent();
+        self::assertIsString($content);
+
+        return json_decode($content, true, flags: \JSON_THROW_ON_ERROR);
     }
 
     public function testFailureIsRewrittenIntoTheApiErrorShape(): void
     {
         $event = $this->dispatch(new JWTAuthenticationFailureResponse('Expired JWT Token'));
 
-        self::assertSame(Response::HTTP_UNAUTHORIZED, $event->getResponse()->getStatusCode());
+        self::assertSame(Response::HTTP_UNAUTHORIZED, $this->getResponseOfEvent($event)->getStatusCode());
         self::assertSame(['errors' => ['_' => ['Expired JWT Token']]], $this->getResponseBodyOfEvent($event));
     }
 
@@ -43,6 +55,6 @@ final class JwtFailureListenerTest extends TestCase
         $event = $this->dispatch(new JWTAuthenticationFailureResponse());
 
         // a 401 without it is not a valid challenge
-        self::assertSame('Bearer', $event->getResponse()->headers->get('WWW-Authenticate'));
+        self::assertSame('Bearer', $this->getResponseOfEvent($event)->headers->get('WWW-Authenticate'));
     }
 }

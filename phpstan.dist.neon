@@ -1,0 +1,11 @@
+parameters:
+    level: 8
+    paths:
+        - src
+        - tests
+        - migrations
+    symfony:
+        # tests are the only code fetching services from the test container
+        containerXmlPath: var/cache/test/App_KernelTestDebugContainer.xml
+    doctrine:
+        objectManagerLoader: tests/object-manager.php

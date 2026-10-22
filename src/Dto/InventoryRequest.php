@@ -22,9 +22,9 @@ final class InventoryRequest
         $this->quantity = $quantity;
     }
 
-    public function getQuantity(): ?int
+    public function getQuantity(): int
     {
-        return $this->quantity;
+        return $this->quantity ?? throw new \LogicException('Quantity read before validation.');
     }
 
     public function setLowStockThreshold(?int $lowStockThreshold): void
@@ -32,8 +32,8 @@ final class InventoryRequest
         $this->lowStockThreshold = $lowStockThreshold;
     }
 
-    public function getLowStockThreshold(): ?int
+    public function getLowStockThreshold(): int
     {
-        return $this->lowStockThreshold;
+        return $this->lowStockThreshold ?? throw new \LogicException('Low stock threshold read before validation.');
     }
 }

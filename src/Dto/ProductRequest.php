@@ -60,9 +60,10 @@ final class ProductRequest
         $this->price = trim($price);
     }
 
+    /** @return numeric-string */
     public function getPrice(): string
     {
-        return $this->price;
+        return is_numeric($this->price) ? $this->price : throw new \LogicException('Price read before validation.');
     }
 
     public function setSku(string $sku): void
@@ -80,8 +81,8 @@ final class ProductRequest
         $this->categoryId = $categoryId;
     }
 
-    public function getCategoryId(): ?int
+    public function getCategoryId(): int
     {
-        return $this->categoryId;
+        return $this->categoryId ?? throw new \LogicException('Category ID read before validation.');
     }
 }

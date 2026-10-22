@@ -4,15 +4,15 @@
 A REST API for e-commerce order and inventory management.
 
 Stack: Symfony 7.4, Doctrine ORM 3, MySQL 8.4, Composer, PHP 8.3, PHPUnit 12,
-LexikJWTAuthenticationBundle, Monolog, PHP-CS-Fixer, running entirely in Docker.
+LexikJWTAuthenticationBundle, Monolog, PHP-CS-Fixer, PHPStan (level 8), running entirely in Docker.
 
 The domain is deliberately ordinary — categories, products, stock, orders. Three things worth a reviewer's time:
 
 - **Stock is locked, not checked.** `SELECT ... FOR UPDATE` in sorted product order to rule out deadlocks, plus a refresh hint because Doctrine's identity map handed back a stale row after the wait — and a concurrency test that proves the request actually blocked. → [Decisions](#decisions)
 - **An N+1 that no serializer group could fix.** The inverse side of a one-to-one is queried during hydration, before groups are consulted. Measured: one extra query per product without the join, none with it, pinned by a test that counts statements. → [Decisions](#decisions)
-- **Tests checked by breaking the code they guard.** Each assertion verified by hand: mutate the code, confirm the named test — and only that test — fails. It repeatedly caught tests that were green for the wrong reason. → [Tests](#tests)
+- **Tests checked by breaking the code they guard.** Each assertion verified by hand: mutate the code, confirm the named test — and only that test — fails. It repeatedly caught tests that were green for the wrong reason. → [Tests](#tests-and-quality)
 
-**171 tests, 490 assertions.** Everything described below is running code.
+**171 tests, 541 assertions.** Everything described below is running code.
 
 [Jakub Klonowski](https://www.linkedin.com/in/jakubklonowski/) is the author.
 
@@ -176,13 +176,13 @@ send `"price": 19.99` as a number (422), ask for someone else's order with your 
 token (403), or change a status as a customer (403). Every one of them answers the same
 error shape.
 
-## Tests
+## Tests and quality
 
 ```bash
 docker compose exec php php bin/phpunit
 ```
 
-There are **171 tests, 490 assertions**, separated into three groups.
+There are **171 tests, 541 assertions**, separated into three groups.
 Unit tests are in `tests/Entity`, `tests/Enum` and `tests/EventListener` - they need no container.
 `tests/Command` boots the kernel.
 Tests in `tests/Api` drive the full HTTP stack against a real MySQL database.
@@ -209,6 +209,14 @@ named test fails and nothing else does. This has repeatedly caught tests that we
 green for the wrong reason, e.g. one asserted a query count while Doctrine served everything
 from its identity map, or nothing checked which user was recorded
 against an admin-driven status change of a customer-created order.
+
+**Static analysis has no baseline.** PHPStan runs at level 8 over `src`, `tests` and
+`migrations`, and every error it found was fixed in code rather than ignored or recorded
+in a baseline file. CI runs it on every push, right after the code style check:
+
+```bash
+docker compose exec php vendor/bin/phpstan analyse --memory-limit=1G
+```
 
 ## Decisions
 
@@ -282,7 +290,6 @@ drift itself is still reachable. Order placement, where it actually matters, doe
 
 ## Further development
 
-- **PHPStan** for static analysis
 - **Infection**, to automate the by-hand mutation checks described under Tests
 - **OpenAPI documentation**, generated from the controllers and DTOs
 - **Seed data**, so a fresh setup has categories, products and stock to try the API against without creating them by hand first

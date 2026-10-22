@@ -91,12 +91,14 @@ final class OrderConcurrencyTest extends ApiTestCase
     {
         $queries = static::getContainer()->get('doctrine.debug_data_holder');
         $connection = $this->em->getConnection();
+        $productId = $this->product->getId();
+        self::assertNotNull($productId);
 
         $connection->beginTransaction();
         $queries->reset();
 
         static::getContainer()->get(InventoryRepository::class)
-            ->findOneByProductIdForUpdate($this->product->getId());
+            ->findOneByProductIdForUpdate($productId);
 
         $connection->rollBack();
 
@@ -133,17 +135,16 @@ final class OrderConcurrencyTest extends ApiTestCase
         $this->orderOne();
         self::assertResponseStatusCodeSame(409);
 
+        self::assertNotNull($this->blocker);
         $this->blocker->rollBack();
         $this->blocker->close();
         $this->blocker = null;
 
         $this->em->clear();
         self::assertCount(0, $this->em->getRepository(Order::class)->findAll());
-        self::assertSame(
-            1,
-            $this->em->getRepository(Inventory::class)
-                ->findOneBy(['product' => $this->product->getId()])
-                ->getAvailableQuantity()
-        );
+
+        $stock = $this->em->getRepository(Inventory::class)->findOneBy(['product' => $this->product->getId()]);
+        self::assertNotNull($stock);
+        self::assertSame(1, $stock->getAvailableQuantity());
     }
 }

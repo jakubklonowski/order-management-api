@@ -43,7 +43,8 @@ abstract class ApiTestCase extends WebTestCase
      */
     protected function responseBody(): array
     {
-        return json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        // BrowserKit getInternalResponse instead of getResponse as it's typed always as string
+        return json_decode($this->client->getInternalResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
     }
 
     protected function createUser(string $email, UserRole $role = UserRole::Customer, string $password = 'pass1234'): User

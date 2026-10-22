@@ -69,11 +69,15 @@ final class ProductController extends AbstractController
             return $this->skuConflict();
         }
 
+        // CategoryExists validated it, so null means it was deleted in the meantime
+        $category = $this->categories->find($request->getCategoryId())
+            ?? throw new \LogicException('Category deleted after validation.');
+
         $product = new Product(
             $request->getName(),
             $request->getPrice(),
             $request->getSku(),
-            $this->categories->find($request->getCategoryId()),
+            $category,
         );
         $product->setDescription($request->getDescription());
 
@@ -96,11 +100,14 @@ final class ProductController extends AbstractController
             return $this->skuConflict();
         }
 
+        $category = $this->categories->find($request->getCategoryId())
+            ?? throw new \LogicException('Category deleted after validation.');
+
         $product->setName($request->getName())
             ->setDescription($request->getDescription())
             ->setPrice($request->getPrice())
             ->setSku($request->getSku())
-            ->setCategory($this->categories->find($request->getCategoryId()));
+            ->setCategory($category);
 
         try {
             $this->em->flush();

@@ -24,7 +24,7 @@ final class OrderPlacer
     /**
      * Reserves stock and creates the order in one transaction.
      *
-     * @param list<OrderItemRequest> $orderLines
+     * @param array<OrderItemRequest> $orderLines
      *
      * @throws InsufficientStockException when any line cannot be reserved
      */
@@ -36,7 +36,7 @@ final class OrderPlacer
     }
 
     /**
-     * @param list<OrderItemRequest> $lines
+     * @param array<OrderItemRequest> $lines
      *
      * @return array<int, int> [product ID => quantity]
      */

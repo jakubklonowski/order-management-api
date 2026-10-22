@@ -64,15 +64,21 @@ final class OrderStatusTest extends ApiTestCase
     private function reloadStock(): Inventory
     {
         $this->em->clear();
+        $inventory = $this->em->getRepository(Inventory::class)->findOneBy(['product' => $this->product->getId()]);
 
-        return $this->em->getRepository(Inventory::class)->findOneBy(['product' => $this->product->getId()]);
+        self::assertNotNull($inventory);
+
+        return $inventory;
     }
 
     private function reloadOrder(int $orderId): Order
     {
         $this->em->clear();
+        $order = $this->em->getRepository(Order::class)->find($orderId);
 
-        return $this->em->getRepository(Order::class)->find($orderId);
+        self::assertNotNull($order);
+
+        return $order;
     }
 
     public function testCustomerCancelsOwnOrder(): void

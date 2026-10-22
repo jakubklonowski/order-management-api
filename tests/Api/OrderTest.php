@@ -33,6 +33,7 @@ final class OrderTest extends ApiTestCase
         $this->em->flush();
     }
 
+    /** @param numeric-string $price */
     private function product(string $sku, string $price = '19.99', ?int $stock = 10): Product
     {
         $product = new Product('Hammer', $price, $sku, $this->category);
@@ -56,10 +57,12 @@ final class OrderTest extends ApiTestCase
         return json_encode(['items' => $lines], \JSON_THROW_ON_ERROR);
     }
 
-    private function availableFor(int $productId): int
+    private function availableFor(Product $product): int
     {
         $this->em->clear();
-        $inventory = $this->em->getRepository(Inventory::class)->findOneBy(['product' => $productId]);
+        $inventory = $this->em->getRepository(Inventory::class)->findOneBy(['product' => $product->getId()]);
+
+        self::assertNotNull($inventory);
 
         return $inventory->getAvailableQuantity();
     }
@@ -109,7 +112,7 @@ final class OrderTest extends ApiTestCase
 
         self::assertResponseStatusCodeSame(201);
         // quantity is untouched, only the reserved number changed
-        self::assertSame(7, $this->availableFor($product->getId()));
+        self::assertSame(7, $this->availableFor($product));
     }
 
     public function testTotalKeepsTwoDecimalPlaces(): void
@@ -149,7 +152,7 @@ final class OrderTest extends ApiTestCase
 
         self::assertResponseStatusCodeSame(409);
         self::assertArrayHasKey('items', $this->responseBody()['errors']);
-        self::assertSame(5, $this->availableFor($product->getId()));
+        self::assertSame(5, $this->availableFor($product));
         self::assertSame(0, $this->countOrders());
     }
 
@@ -165,8 +168,8 @@ final class OrderTest extends ApiTestCase
 
         self::assertResponseStatusCodeSame(409);
         // first line reserved successfully before the second failed
-        self::assertSame(10, $this->availableFor($plenty->getId()));
-        self::assertSame(1, $this->availableFor($scarce->getId()));
+        self::assertSame(10, $this->availableFor($plenty));
+        self::assertSame(1, $this->availableFor($scarce));
         self::assertSame(0, $this->countOrders());
     }
 
@@ -194,7 +197,7 @@ final class OrderTest extends ApiTestCase
         self::assertResponseStatusCodeSame(201);
         self::assertCount(1, $this->responseBody()['items']);
         self::assertSame(5, $this->responseBody()['items'][0]['quantity']);
-        self::assertSame(5, $this->availableFor($product->getId()));
+        self::assertSame(5, $this->availableFor($product));
     }
 
     public function testOrderRejectsUnknownProduct(): void

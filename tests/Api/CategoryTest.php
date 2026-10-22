@@ -44,8 +44,11 @@ final class CategoryTest extends ApiTestCase
     }
 
     // clears cache so test is forced to assert data against database
-    private function reload(int $id): Category
+    private function reload(?int $id): Category
     {
+        // getId() is null for an entity that was never flushed
+        self::assertNotNull($id);
+
         $this->em->clear();
         $category = $this->em->getRepository(Category::class)->find($id);
 
@@ -128,7 +131,7 @@ final class CategoryTest extends ApiTestCase
 
         self::assertResponseStatusCodeSame(201);
         self::assertSame($parentId, $this->responseBody()['parentId']);
-        self::assertSame($parentId, $this->reload($this->responseBody()['id'])->getParent()->getId());
+        self::assertSame($parentId, $this->reload($this->responseBody()['id'])->getParentId());
     }
 
     public function testCreateRejectsBlankName(): void
@@ -162,7 +165,7 @@ final class CategoryTest extends ApiTestCase
 
         $updated = $this->reload($categoryId);
         self::assertSame('Hammers', $updated->getName());
-        self::assertSame($parentId, $updated->getParent()->getId());
+        self::assertSame($parentId, $updated->getParentId());
     }
 
     public function testUpdateCanRemoveTheParent(): void

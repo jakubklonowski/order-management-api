@@ -65,7 +65,8 @@ final class OrderStatusChanger
         $productIds = [];
 
         foreach ($order->getItems() as $item) {
-            $productIds[] = $item->getProduct()->getId();
+            // LogicException below serves only PHPStan as of today
+            $productIds[] = $item->getProduct()->getId() ?? throw new \LogicException('Order item points at an unsaved product.');
         }
 
         return $productIds;

@@ -49,7 +49,7 @@ final class ErrorContractTest extends ApiTestCase
         $this->request($method, $uri, $body);
 
         self::assertResponseStatusCodeSame($expectedStatus);
-        $response = json_decode($this->client->getResponse()->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+        $response = $this->responseBody();
 
         self::assertSame(['errors'], array_keys($response));
         self::assertNotEmpty($response['errors']);

@@ -59,11 +59,14 @@ final class InventoryTest extends ApiTestCase
     }
 
     // clears cache so test is forced to assert data against database
-    private function reload(int $productId): ?Inventory
+    private function reload(Product $product): Inventory
     {
         $this->em->clear();
+        $inventory = $this->em->getRepository(Inventory::class)->findOneBy(['product' => $product->getId()]);
 
-        return $this->em->getRepository(Inventory::class)->findOneBy(['product' => $productId]);
+        self::assertNotNull($inventory);
+
+        return $inventory;
     }
 
     public function testReadingRequiresAuthentication(): void
@@ -132,7 +135,7 @@ final class InventoryTest extends ApiTestCase
         $this->request('PUT', '/api/inventory/'.$product->getId(), self::payload(), $this->customerToken);
 
         self::assertResponseStatusCodeSame(403);
-        self::assertSame(10, $this->reload($product->getId())->getQuantity());
+        self::assertSame(10, $this->reload($product)->getQuantity());
     }
 
     public function testUpdateCreatesTheMissingStockRecord(): void
@@ -145,8 +148,7 @@ final class InventoryTest extends ApiTestCase
         self::assertResponseStatusCodeSame(201);
         self::assertSame(25, $this->responseBody()['quantity']);
 
-        $stored = $this->reload($product->getId());
-        self::assertNotNull($stored);
+        $stored = $this->reload($product);
         self::assertSame(25, $stored->getQuantity());
         self::assertSame(5, $stored->getLowStockThreshold());
         self::assertSame(0, $stored->getReservedQuantity());
@@ -160,7 +162,7 @@ final class InventoryTest extends ApiTestCase
 
         self::assertResponseStatusCodeSame(200);
 
-        $stored = $this->reload($product->getId());
+        $stored = $this->reload($product);
         self::assertSame(25, $stored->getQuantity());
         self::assertSame(5, $stored->getLowStockThreshold());
     }
@@ -177,7 +179,7 @@ final class InventoryTest extends ApiTestCase
         ], \JSON_THROW_ON_ERROR), $this->adminToken);
 
         self::assertResponseIsSuccessful();
-        self::assertSame(4, $this->reload($product->getId())->getReservedQuantity());
+        self::assertSame(4, $this->reload($product)->getReservedQuantity());
     }
 
     public function testUpdateRejectsQuantityBelowReservedStock(): void
@@ -188,7 +190,7 @@ final class InventoryTest extends ApiTestCase
 
         self::assertResponseStatusCodeSame(409);
         self::assertArrayHasKey('quantity', $this->responseBody()['errors']);
-        self::assertSame(10, $this->reload($product->getId())->getQuantity());
+        self::assertSame(10, $this->reload($product)->getQuantity());
     }
 
     public function testUpdateAcceptsQuantityEqualToReservedStock(): void
@@ -209,7 +211,7 @@ final class InventoryTest extends ApiTestCase
 
         self::assertResponseStatusCodeSame(422);
         self::assertArrayHasKey('quantity', $this->responseBody()['errors']);
-        self::assertSame(10, $this->reload($product->getId())->getQuantity());
+        self::assertSame(10, $this->reload($product)->getQuantity());
     }
 
     public function testUpdateRejectsMissingFields(): void
