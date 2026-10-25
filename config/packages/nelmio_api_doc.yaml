@@ -1,0 +1,88 @@
+nelmio_api_doc:
+    documentation:
+        info:
+            title: Order & Inventory Management API
+            version: 1.0.0
+            description: |
+                Every failure answers `{"errors": {"<field>": ["message"]}}`. That includes 400 for
+                malformed JSON and 405 for a wrong method, which are not repeated on each operation.
+
+                422 means the values sent are malformed and can never succeed as they are. 409 means the
+                request conflicts with the current state (a duplicate SKU or email, insufficient stock,
+                an illegal status transition) and could succeed later unchanged.
+
+                Prices are decimal strings such as `"19.99"`, never JSON numbers.
+
+                Log in with `POST /api/login`, then use **Authorize** with the returned token.
+        components:
+            securitySchemes:
+                Bearer:
+                    type: http
+                    scheme: bearer
+                    bearerFormat: JWT
+            schemas:
+                Error:
+                    type: object
+                    required: [errors]
+                    properties:
+                        errors:
+                            type: object
+                            additionalProperties:
+                                type: array
+                                items:
+                                    type: string
+            responses:
+                Unauthorized:
+                    description: The token is missing, invalid or expired.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+                InvalidCredentials:
+                    description: The email and password do not match an account.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+                Forbidden:
+                    description: The token is valid, but its user may not do this.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+                NotFound:
+                    description: No resource with this id.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+                Conflict:
+                    description: The request conflicts with the current state and could succeed later unchanged.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+                            example: { errors: { sku: ['SKU is already in use.'] } }
+                ValidationFailed:
+                    description: The values sent are malformed. Messages are grouped by field.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+                            example: { errors: { price: ['Price must be a decimal string with up to 8 digits and 2 decimal places e.g. "19.99".'] } }
+        security:
+            - Bearer: []
+    areas:
+        # everything under /api except the docs routes
+        path_patterns:
+            - '^/api(?!/doc(\.json)?$)'
+    models:
+        # one schema per serializer group so api docs will label them right (not Product, Product2...)
+        names:
+            - { alias: Category, type: App\Entity\Category, groups: ['category:read'] }
+            - { alias: ProductListItem, type: App\Entity\Product, groups: ['product:list'] }
+            - { alias: Product, type: App\Entity\Product, groups: ['product:read'] }
+            - { alias: Inventory, type: App\Entity\Inventory, groups: ['inventory:read'] }
+            - { alias: OrderSummary, type: App\Entity\Order, groups: ['order:list'] }
+            - { alias: Order, type: App\Entity\Order, groups: ['order:read'] }
+            - { alias: OrderStatusHistory, type: App\Entity\OrderStatusHistory, groups: ['order:history'] }

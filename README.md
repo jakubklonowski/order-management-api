@@ -4,7 +4,8 @@
 A REST API for e-commerce order and inventory management.
 
 Stack: Symfony 7.4, Doctrine ORM 3, MySQL 8.4, Composer, PHP 8.3, PHPUnit 12,
-LexikJWTAuthenticationBundle, Monolog, PHP-CS-Fixer, PHPStan (level 8), running entirely in Docker.
+LexikJWTAuthenticationBundle, NelmioApiDocBundle (OpenAPI 3), Monolog, PHP-CS-Fixer, PHPStan (level 8),
+running entirely in Docker.
 
 The domain is deliberately ordinary — categories, products, stock, orders. Three things worth a reviewer's time:
 
@@ -12,16 +13,18 @@ The domain is deliberately ordinary — categories, products, stock, orders. Thr
 - **An N+1 that no serializer group could fix.** The inverse side of a one-to-one is queried during hydration, before groups are consulted. Measured: one extra query per product without the join, none with it, pinned by a test that counts statements. → [Decisions](#decisions)
 - **Tests checked by breaking the code they guard.** Each assertion verified by hand: mutate the code, confirm the named test — and only that test — fails. It repeatedly caught tests that were green for the wrong reason. → [Tests](#tests-and-quality)
 
-**171 tests, 541 assertions.** Everything described below is running code.
+Everything described below is running code.
 
 [Jakub Klonowski](https://www.linkedin.com/in/jakubklonowski/) is the author.
 
 ## Project contents
 
 Twenty endpoints were created; all except register and login require a JWT.
+Their OpenAPI documentation is public.
 
 | resource | endpoints | access |
 |---|---|---|
+| docs | `GET /api/doc` (Swagger UI), `GET /api/doc.json` (the spec) | public |
 | auth | `POST /api/register`, `POST /api/login` | public |
 | categories | `GET` list & one, `POST`, `PUT /{id}`, `DELETE /{id}` | read: any user · write: admin |
 | products | `GET` list & one, `POST`, `PUT /{id}`, `DELETE /{id}` | read: any user · write: admin |
@@ -79,13 +82,18 @@ Every step is safe to repeat, so re-running is not a problem.
 The JWT keypair in `config/jwt/*.pem` is gitignored, so a fresh clone has none and needs
 a new one generated, or `/api/login` will fail.
 
-After setup, the API is available at **http://localhost:8080**.
+After setup, the API is available at **http://localhost:8080**, and its interactive
+documentation at **http://localhost:8080/api/doc**.
 To use another port, change the `NGINX_PORT` value in `.env`.
 Adminer is on port `8081` for browsing the database directly.
 
 ## Trying it
 
-Every example below is plain `curl`, so it runs anywhere without importing anything.
+The quickest look is Swagger UI at **http://localhost:8080/api/doc**, where every endpoint
+can be browsed and tried: run `POST /api/login`, press **Authorize** and paste the token.
+Postman and Insomnia can also import the whole API from `/api/doc.json`.
+
+The guided walkthrough below is plain `curl`, so it runs anywhere without importing anything.
 The same requests work unchanged in Postman or Insomnia — set the body type to JSON and
 put the token in an `Authorization: Bearer` header. The shell snippets assume bash; on
 Windows use Git Bash rather than PowerShell, whose quoting differs.
@@ -182,12 +190,14 @@ error shape.
 docker compose exec php php bin/phpunit
 ```
 
-There are **171 tests, 541 assertions**, separated into three groups.
+There are **178 tests, 578 assertions**, separated into three groups.
 Unit tests are in `tests/Entity`, `tests/Enum` and `tests/EventListener` - they need no container.
 `tests/Command` boots the kernel.
 Tests in `tests/Api` drive the full HTTP stack against a real MySQL database.
+Among them, `ApiDocTest` fails when the OpenAPI spec drifts from the code, e.g. an undocumented
+route or a required field documented as optional.
 
-Four things the suite does on purpose:
+Five things the suite does on purpose:
 
 **Failure tests assert the absence of side effects.** A rejected request must return 422
 and leave the table untouched, to be sure that no persistence bug occurred.
@@ -271,7 +281,6 @@ join in `ProductRepository::paginate()`, measured on a three-product page:
 **5 queries without the join, 2 with it.** The two are the floor for any paginated
 listing — one count, one fetch; the extra three were one inventory lookup per product,
 growing with the page size.
-
 ## Known problems
 
 Stated plainly rather than left to be discovered.
@@ -291,7 +300,6 @@ drift itself is still reachable. Order placement, where it actually matters, doe
 ## Further development
 
 - **Infection**, to automate the by-hand mutation checks described under Tests
-- **OpenAPI documentation**, generated from the controllers and DTOs
 - **Seed data**, so a fresh setup has categories, products and stock to try the API against without creating them by hand first
 - **Domain indexes and a timestamp-precision migration** as schema changes
 - **Promo codes applied to order totals**, which is what the `bcmath` groundwork is for

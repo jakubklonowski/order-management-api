@@ -8,6 +8,8 @@ use App\Dto\InventoryRequest;
 use App\Entity\Inventory;
 use App\Entity\Product;
 use Doctrine\ORM\EntityManagerInterface;
+use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Attributes as OA;
 use Symfony\Bridge\Doctrine\Attribute\MapEntity;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -18,6 +20,9 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api/inventory', requirements: ['productId' => '\d+'])]
 #[IsGranted('ROLE_ADMIN')] // customers should never be able to access this controller
+#[OA\Tag(name: 'Inventory')]
+#[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
+#[OA\Response(response: 403, ref: '#/components/responses/Forbidden')]
 final class InventoryController extends AbstractController
 {
     private const READ = ['groups' => 'inventory:read'];
@@ -27,6 +32,12 @@ final class InventoryController extends AbstractController
     }
 
     #[Route('/{productId}', name: 'api_inventory_show', methods: ['GET'])]
+    #[OA\Response(
+        response: 200,
+        description: 'The stock of the product.',
+        content: new Model(type: Inventory::class, groups: [self::READ['groups']]),
+    )]
+    #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
     public function show(#[MapEntity(id: 'productId')] Product $product): JsonResponse
     {
         $inventory = $product->getInventory();
@@ -39,6 +50,19 @@ final class InventoryController extends AbstractController
     }
 
     #[Route('/{productId}', name: 'api_inventory_update', methods: ['PUT'])]
+    #[OA\Response(
+        response: 200,
+        description: 'The stock was updated.',
+        content: new Model(type: Inventory::class, groups: [self::READ['groups']]),
+    )]
+    #[OA\Response(
+        response: 201,
+        description: 'The product had no stock yet, so it was created.',
+        content: new Model(type: Inventory::class, groups: [self::READ['groups']]),
+    )]
+    #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
+    #[OA\Response(response: 409, ref: '#/components/responses/Conflict')]
+    #[OA\Response(response: 422, ref: '#/components/responses/ValidationFailed')]
     public function update(
         #[MapEntity(id: 'productId')] Product $product,
         #[MapRequestPayload] InventoryRequest $request,

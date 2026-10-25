@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Dto;
 
 use App\Validator\CategoryExists;
+use OpenApi\Attributes as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
+#[OA\Schema(required: ['name'])]
 final class CategoryRequest
 {
     #[Assert\NotBlank(message: 'Name is required.', normalizer: 'trim')]

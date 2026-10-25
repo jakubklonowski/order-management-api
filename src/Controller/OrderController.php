@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Dto\OrderRequest;
 use App\Dto\OrderStatusRequest;
 use App\Entity\Order;
+use App\Entity\OrderStatusHistory;
 use App\Entity\User;
 use App\Enum\OrderStatus;
 use App\Enum\UserRole;
@@ -16,6 +17,8 @@ use App\Security\OrderVoter;
 use App\Service\OrderPlacer;
 use App\Service\OrderStatusChanger;
 use Doctrine\DBAL\Exception\LockWaitTimeoutException;
+use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -25,6 +28,8 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api/orders', requirements: ['id' => '\d+'])]
+#[OA\Tag(name: 'Orders')]
+#[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
 final class OrderController extends AbstractController
 {
     private const LIST = ['groups' => 'order:list'];
@@ -39,6 +44,14 @@ final class OrderController extends AbstractController
     }
 
     #[Route('', name: 'api_orders_index', methods: ['GET'])]
+    #[OA\Response(
+        response: 200,
+        description: "The caller's own orders, or every order for an admin. Newest first.",
+        content: new OA\JsonContent(
+            type: 'array',
+            items: new OA\Items(ref: new Model(type: Order::class, groups: [self::LIST['groups']])),
+        ),
+    )]
     public function index(#[CurrentUser] User $user): JsonResponse
     {
         $orders = UserRole::Admin === $user->getRole()
@@ -49,6 +62,13 @@ final class OrderController extends AbstractController
     }
 
     #[Route('/{id}', name: 'api_orders_show', methods: ['GET'])]
+    #[OA\Response(
+        response: 200,
+        description: 'The order with its items.',
+        content: new Model(type: Order::class, groups: [self::READ['groups']]),
+    )]
+    #[OA\Response(response: 403, ref: '#/components/responses/Forbidden')]
+    #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
     public function show(Order $order): JsonResponse
     {
         $this->denyAccessUnlessGranted(OrderVoter::VIEW, $order);
@@ -57,6 +77,14 @@ final class OrderController extends AbstractController
     }
 
     #[Route('/{id}/cancel', name: 'api_orders_cancel', methods: ['POST'])]
+    #[OA\Response(
+        response: 200,
+        description: 'The order was cancelled and its stock released.',
+        content: new Model(type: Order::class, groups: [self::READ['groups']]),
+    )]
+    #[OA\Response(response: 403, ref: '#/components/responses/Forbidden')]
+    #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
+    #[OA\Response(response: 409, ref: '#/components/responses/Conflict')]
     public function cancel(Order $order, #[CurrentUser] User $user): JsonResponse
     {
         $this->denyAccessUnlessGranted(OrderVoter::CANCEL, $order);
@@ -66,6 +94,15 @@ final class OrderController extends AbstractController
 
     #[Route('/{id}/status', name: 'api_orders_status', methods: ['PUT'])]
     #[IsGranted('ROLE_ADMIN')]
+    #[OA\Response(
+        response: 200,
+        description: 'The order moved to the new status.',
+        content: new Model(type: Order::class, groups: [self::READ['groups']]),
+    )]
+    #[OA\Response(response: 403, ref: '#/components/responses/Forbidden')]
+    #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
+    #[OA\Response(response: 409, ref: '#/components/responses/Conflict')]
+    #[OA\Response(response: 422, ref: '#/components/responses/ValidationFailed')]
     public function status(
         Order $order,
         #[MapRequestPayload] OrderStatusRequest $request,
@@ -90,6 +127,16 @@ final class OrderController extends AbstractController
     }
 
     #[Route('/{id}/history', name: 'api_orders_history', methods: ['GET'])]
+    #[OA\Response(
+        response: 200,
+        description: 'Every status the order has had, oldest first, with who changed it.',
+        content: new OA\JsonContent(
+            type: 'array',
+            items: new OA\Items(ref: new Model(type: OrderStatusHistory::class, groups: [self::HISTORY['groups']])),
+        ),
+    )]
+    #[OA\Response(response: 403, ref: '#/components/responses/Forbidden')]
+    #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
     public function history(Order $order): JsonResponse
     {
         $this->denyAccessUnlessGranted(OrderVoter::VIEW, $order);
@@ -98,6 +145,13 @@ final class OrderController extends AbstractController
     }
 
     #[Route('', name: 'api_orders_create', methods: ['POST'])]
+    #[OA\Response(
+        response: 201,
+        description: 'The order was placed and its stock reserved.',
+        content: new Model(type: Order::class, groups: [self::READ['groups']]),
+    )]
+    #[OA\Response(response: 409, ref: '#/components/responses/Conflict')]
+    #[OA\Response(response: 422, ref: '#/components/responses/ValidationFailed')]
     public function create(#[CurrentUser] User $user, #[MapRequestPayload] OrderRequest $request): JsonResponse
     {
         try {

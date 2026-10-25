@@ -47,6 +47,7 @@ NGINX_PORT="$(grep -E '^NGINX_PORT=' .env | cut -d= -f2)"
 ADMINER_PORT="$(grep -E '^ADMINER_PORT=' .env | cut -d= -f2)"
 
 printf '\nThe API is at http://localhost:%s\n\n' "${NGINX_PORT:-8080}"
+printf '  API docs:       http://localhost:%s/api/doc\n' "${NGINX_PORT:-8080}"
 printf '  Run the tests:  docker compose exec php php bin/phpunit\n'
 printf '  Browse the DB:  http://localhost:%s\n' "${ADMINER_PORT:-8081}"
 

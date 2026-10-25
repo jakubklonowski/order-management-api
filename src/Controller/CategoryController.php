@@ -10,6 +10,8 @@ use App\EventListener\ApiExceptionListener;
 use App\Repository\CategoryRepository;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
+use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -18,6 +20,8 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api/categories', requirements: ['id' => '\d+'])]
+#[OA\Tag(name: 'Categories')]
+#[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
 final class CategoryController extends AbstractController
 {
     private const READ = ['groups' => 'category:read'];
@@ -29,12 +33,26 @@ final class CategoryController extends AbstractController
     }
 
     #[Route('', name: 'api_categories_index', methods: ['GET'])]
+    #[OA\Response(
+        response: 200,
+        description: 'Every category, sorted by name.',
+        content: new OA\JsonContent(
+            type: 'array',
+            items: new OA\Items(ref: new Model(type: Category::class, groups: [self::READ['groups']])),
+        ),
+    )]
     public function index(): JsonResponse
     {
         return $this->json($this->categories->findBy([], ['name' => 'ASC']), Response::HTTP_OK, [], self::READ);
     }
 
     #[Route('/{id}', name: 'api_categories_show', methods: ['GET'])]
+    #[OA\Response(
+        response: 200,
+        description: 'The category.',
+        content: new Model(type: Category::class, groups: [self::READ['groups']]),
+    )]
+    #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
     public function show(Category $category): JsonResponse
     {
         return $this->json($category, Response::HTTP_OK, [], self::READ);
@@ -42,6 +60,13 @@ final class CategoryController extends AbstractController
 
     #[Route('', name: 'api_categories_create', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
+    #[OA\Response(
+        response: 201,
+        description: 'The category was created.',
+        content: new Model(type: Category::class, groups: [self::READ['groups']]),
+    )]
+    #[OA\Response(response: 403, ref: '#/components/responses/Forbidden')]
+    #[OA\Response(response: 422, ref: '#/components/responses/ValidationFailed')]
     public function create(#[MapRequestPayload] CategoryRequest $request): JsonResponse
     {
         $category = new Category($request->getName());
@@ -55,6 +80,14 @@ final class CategoryController extends AbstractController
 
     #[Route('/{id}', name: 'api_categories_update', methods: ['PUT'])]
     #[IsGranted('ROLE_ADMIN')]
+    #[OA\Response(
+        response: 200,
+        description: 'The category was updated.',
+        content: new Model(type: Category::class, groups: [self::READ['groups']]),
+    )]
+    #[OA\Response(response: 403, ref: '#/components/responses/Forbidden')]
+    #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
+    #[OA\Response(response: 422, ref: '#/components/responses/ValidationFailed')]
     public function update(Category $category, #[MapRequestPayload] CategoryRequest $request): JsonResponse
     {
         $parent = $this->getCategoryById($request->getParentId());
@@ -74,6 +107,10 @@ final class CategoryController extends AbstractController
 
     #[Route('/{id}', name: 'api_categories_delete', methods: ['DELETE'])]
     #[IsGranted('ROLE_ADMIN')]
+    #[OA\Response(response: 204, description: 'The category was deleted.')]
+    #[OA\Response(response: 403, ref: '#/components/responses/Forbidden')]
+    #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
+    #[OA\Response(response: 409, ref: '#/components/responses/Conflict')]
     public function delete(Category $category): Response
     {
         try {

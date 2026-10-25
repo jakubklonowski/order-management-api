@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace App\Dto;
 
 use App\Validator\CategoryExists;
+use OpenApi\Attributes as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
+#[OA\Schema(required: ['name', 'price', 'sku', 'categoryId'])]
 final class ProductRequest
 {
+    private const PRICE_PATTERN = '^\d{1,8}(\.\d{1,2})?$';
+
     #[Assert\NotBlank(message: 'Name is required.', normalizer: 'trim')]
     #[Assert\Length(max: 255)]
     private string $name = '';
@@ -19,9 +23,12 @@ final class ProductRequest
     // price as string because of binary representation of decimals being imprecise
     #[Assert\NotBlank(message: 'Price is required.')]
     #[Assert\Regex(
-        pattern: '/^\d{1,8}(\.\d{1,2})?$/',
+        pattern: '/'.self::PRICE_PATTERN.'/',
         message: 'Price must be a decimal string with up to 8 digits and 2 decimal places e.g. "19.99".',
+        // OpenApi-only pattern
+        htmlPattern: self::PRICE_PATTERN,
     )]
+    #[OA\Property(example: '19.99')]
     private string $price = '';
 
     #[Assert\NotBlank(message: 'SKU is required.', normalizer: 'trim')]

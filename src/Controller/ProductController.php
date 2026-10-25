@@ -13,6 +13,8 @@ use App\Repository\ProductRepository;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
+use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -22,6 +24,8 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api/products', requirements: ['id' => '\d+'])]
+#[OA\Tag(name: 'Products')]
+#[OA\Response(response: 401, ref: '#/components/responses/Unauthorized')]
 final class ProductController extends AbstractController
 {
     private const LIST = ['groups' => 'product:list'];
@@ -35,6 +39,24 @@ final class ProductController extends AbstractController
     }
 
     #[Route('', name: 'api_products_index', methods: ['GET'])]
+    #[OA\Response(
+        response: 200,
+        description: 'One page of products.',
+        content: new OA\JsonContent(
+            required: ['items', 'page', 'limit', 'total'],
+            properties: [
+                new OA\Property(
+                    property: 'items',
+                    type: 'array',
+                    items: new OA\Items(ref: new Model(type: Product::class, groups: [self::LIST['groups']])),
+                ),
+                new OA\Property(property: 'page', type: 'integer'),
+                new OA\Property(property: 'limit', type: 'integer'),
+                new OA\Property(property: 'total', type: 'integer', description: 'Matching products across all pages.'),
+            ],
+        ),
+    )]
+    #[OA\Response(response: 422, ref: '#/components/responses/ValidationFailed')]
     public function index(
         // returns 422 instead of default 404 on bad query param
         #[MapQueryString(validationFailedStatusCode: Response::HTTP_UNPROCESSABLE_ENTITY)]
@@ -56,6 +78,12 @@ final class ProductController extends AbstractController
     }
 
     #[Route('/{id}', name: 'api_products_show', methods: ['GET'])]
+    #[OA\Response(
+        response: 200,
+        description: 'The product.',
+        content: new Model(type: Product::class, groups: [self::READ['groups']]),
+    )]
+    #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
     public function show(Product $product): JsonResponse
     {
         return $this->json($product, Response::HTTP_OK, [], self::READ);
@@ -63,6 +91,14 @@ final class ProductController extends AbstractController
 
     #[Route('', name: 'api_products_create', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
+    #[OA\Response(
+        response: 201,
+        description: 'The product was created.',
+        content: new Model(type: Product::class, groups: [self::READ['groups']]),
+    )]
+    #[OA\Response(response: 403, ref: '#/components/responses/Forbidden')]
+    #[OA\Response(response: 409, ref: '#/components/responses/Conflict')]
+    #[OA\Response(response: 422, ref: '#/components/responses/ValidationFailed')]
     public function create(#[MapRequestPayload] ProductRequest $request): JsonResponse
     {
         if ($this->skuBelongsToAnotherProduct($request->getSku())) {
@@ -94,6 +130,15 @@ final class ProductController extends AbstractController
 
     #[Route('/{id}', name: 'api_products_update', methods: ['PUT'])]
     #[IsGranted('ROLE_ADMIN')]
+    #[OA\Response(
+        response: 200,
+        description: 'The product was updated.',
+        content: new Model(type: Product::class, groups: [self::READ['groups']]),
+    )]
+    #[OA\Response(response: 403, ref: '#/components/responses/Forbidden')]
+    #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
+    #[OA\Response(response: 409, ref: '#/components/responses/Conflict')]
+    #[OA\Response(response: 422, ref: '#/components/responses/ValidationFailed')]
     public function update(Product $product, #[MapRequestPayload] ProductRequest $request): JsonResponse
     {
         if ($this->skuBelongsToAnotherProduct($request->getSku(), $product->getId())) {
@@ -120,6 +165,10 @@ final class ProductController extends AbstractController
 
     #[Route('/{id}', name: 'api_products_delete', methods: ['DELETE'])]
     #[IsGranted('ROLE_ADMIN')]
+    #[OA\Response(response: 204, description: 'The product was deleted.')]
+    #[OA\Response(response: 403, ref: '#/components/responses/Forbidden')]
+    #[OA\Response(response: 404, ref: '#/components/responses/NotFound')]
+    #[OA\Response(response: 409, ref: '#/components/responses/Conflict')]
     public function delete(Product $product): Response
     {
         try {

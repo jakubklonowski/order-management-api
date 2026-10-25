@@ -8,7 +8,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 final class OrderRequest
 {
-    /** @var array<OrderItemRequest> */
+    /** @var list<OrderItemRequest> */
     #[Assert\Count(min: 1, minMessage: 'An order must contain at least one item.')]
     #[Assert\Valid]
     private array $items;
@@ -16,10 +16,10 @@ final class OrderRequest
     // variadic parameter needed for type enforcing
     public function __construct(OrderItemRequest ...$items)
     {
-        $this->items = $items;
+        $this->items = array_values($items);
     }
 
-    /** @return array<OrderItemRequest> */
+    /** @return list<OrderItemRequest> */
     public function getItems(): array
     {
         return $this->items;
