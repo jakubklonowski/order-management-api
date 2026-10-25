@@ -62,7 +62,7 @@ final class ApiExceptionListenerTest extends TestCase
 
         self::assertNotNull($event->getResponse());
         self::assertSame(Response::HTTP_INTERNAL_SERVER_ERROR, $event->getResponse()->getStatusCode());
-        self::assertSame(['errors' => ['_' => ['Internal Server Error']]], $this->getResponseBodyOfEvent($event));
+        self::assertSame(['errors' => ['general' => ['Internal Server Error']]], $this->getResponseBodyOfEvent($event));
     }
 
     public function testServerErrorDoesNotLeakTheExceptionMessage(): void
@@ -77,7 +77,7 @@ final class ApiExceptionListenerTest extends TestCase
         $event = $this->dispatch('/api/orders/1', new NotFoundHttpException(self::LEAKY_MESSAGE));
 
         self::assertSame(Response::HTTP_NOT_FOUND, $this->getResponseOfEvent($event)->getStatusCode());
-        self::assertSame(['errors' => ['_' => ['Not Found']]], $this->getResponseBodyOfEvent($event));
+        self::assertSame(['errors' => ['general' => ['Not Found']]], $this->getResponseBodyOfEvent($event));
     }
 
     public function testNonApiPathIsLeftToSymfony(): void

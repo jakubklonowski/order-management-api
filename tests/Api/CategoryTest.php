@@ -102,7 +102,7 @@ final class CategoryTest extends ApiTestCase
     {
         $this->request('GET', '/api/categories/999999', token: $this->customerToken);
 
-        self::assertSame(['Not Found'], $this->responseBody()['errors']['_']);
+        self::assertSame(['Not Found'], $this->responseBody()['errors']['general']);
     }
 
     public function testCustomerCannotCreate(): void

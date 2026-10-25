@@ -17,8 +17,8 @@ use Symfony\Component\Validator\Exception\ValidationFailedException;
 #[AsEventListener(priority: -64)]
 final class ApiExceptionListener
 {
-    // key for errors that belong to no particular field
-    public const GENERAL = '_';
+    // key for errors that belong to no particular field, no request field may be called this
+    public const GENERAL = 'general';
 
     public function __invoke(ExceptionEvent $event): void
     {

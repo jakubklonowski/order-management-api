@@ -6,6 +6,8 @@ nelmio_api_doc:
             description: |
                 Every failure answers `{"errors": {"<field>": ["message"]}}`. That includes 400 for
                 malformed JSON and 405 for a wrong method, which are not repeated on each operation.
+                An error that belongs to no field (a 404, a rejected token) is listed under the key
+                `general`, no request field is ever called that.
 
                 422 means the values sent are malformed and can never succeed as they are. 409 means the
                 request conflicts with the current state (a duplicate SKU or email, insufficient stock,

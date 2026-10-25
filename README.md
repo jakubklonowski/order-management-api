@@ -241,6 +241,8 @@ over, which is what stops a client setting `id` or `role` by putting them in a p
 **One error shape for the whole API.** Every failure under `/api` returns
 `{"errors": {"field": ["message"]}}`. That holds for validation failures, 404 and 405,
 for authentication failures, and for unexpected 500s.
+Errors that belong to no field, like a 404 or a bad token, sit under the key `general`,
+and no request field can ever be called `general`.
 It takes two listeners rather than one, because Symfony and the JWT bundle fail through
 different mechanisms.
 

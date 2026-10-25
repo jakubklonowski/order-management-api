@@ -47,7 +47,7 @@ final class JwtFailureListenerTest extends TestCase
         $event = $this->dispatch(new JWTAuthenticationFailureResponse('Expired JWT Token'));
 
         self::assertSame(Response::HTTP_UNAUTHORIZED, $this->getResponseOfEvent($event)->getStatusCode());
-        self::assertSame(['errors' => ['_' => ['Expired JWT Token']]], $this->getResponseBodyOfEvent($event));
+        self::assertSame(['errors' => ['general' => ['Expired JWT Token']]], $this->getResponseBodyOfEvent($event));
     }
 
     public function testAuthenticateHeaderSurvivesTheRewrite(): void
