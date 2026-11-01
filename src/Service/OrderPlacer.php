@@ -8,8 +8,11 @@ use App\Dto\OrderItemRequest;
 use App\Entity\Order;
 use App\Entity\User;
 use App\Exception\InsufficientStockException;
+use App\Message\LowStockReached;
+use App\Message\OrderPlaced;
 use App\Repository\InventoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 final class OrderPlacer
 {
@@ -18,6 +21,7 @@ final class OrderPlacer
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly InventoryRepository $inventories,
+        private readonly MessageBusInterface $bus,
     ) {
     }
 
@@ -61,6 +65,7 @@ final class OrderPlacer
 
         $order = new Order($user);
         $total = '0.00';
+        $newlyLowProductIds = [];
 
         foreach ($orderPositions as $productId => $quantity) {
             $inventory = $inventories[$productId] ?? null;
@@ -70,12 +75,19 @@ final class OrderPlacer
                 throw new InsufficientStockException($productId);
             }
 
+            $alreadyLow = $inventory->isLowStock();
+
             try {
                 $inventory->reserve($quantity);
             } catch (\DomainException) {
                 // reserve() throws bare DomainException caused by insufficient stock;
                 // exception is enriched with $productId and threw again for controller to catch
                 throw new InsufficientStockException($productId);
+            }
+
+            // dispatch low stock alert only if stock was not low and is low now
+            if (!$alreadyLow && $inventory->isLowStock()) {
+                $newlyLowProductIds[] = $productId;
             }
 
             $product = $inventory->getProduct();
@@ -90,6 +102,12 @@ final class OrderPlacer
 
         $this->em->persist($order);
         $this->em->flush();
+
+        $this->bus->dispatch(new OrderPlaced($order->getId() ?? throw new \LogicException('Order has no id after flush.')));
+
+        foreach ($newlyLowProductIds as $productId) {
+            $this->bus->dispatch(new LowStockReached($productId));
+        }
 
         return $order;
     }

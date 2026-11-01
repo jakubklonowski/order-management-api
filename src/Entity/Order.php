@@ -42,6 +42,9 @@ class Order
     #[Groups(['order:list', 'order:read'])]
     private \DateTimeImmutable $createdAt;
 
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $confirmationSentAt = null;
+
     /** @var Collection<int, OrderItem> */
     #[ORM\OneToMany(mappedBy: 'order', targetEntity: OrderItem::class, cascade: ['persist'], orphanRemoval: true)]
     #[Groups(['order:read'])]
@@ -132,6 +135,18 @@ class Order
     public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
+    }
+
+    public function getConfirmationSentAt(): ?\DateTimeImmutable
+    {
+        return $this->confirmationSentAt;
+    }
+
+    public function markConfirmationSent(\DateTimeImmutable $at): static
+    {
+        $this->confirmationSentAt = $at;
+
+        return $this;
     }
 
     /** @return Collection<int, OrderItem> */

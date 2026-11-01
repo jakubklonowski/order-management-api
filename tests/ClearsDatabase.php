@@ -25,6 +25,7 @@ trait ClearsDatabase
             'categories',
             'promo_codes',
             'users',
+            'messenger_messages',
         ] as $table) {
             $connection->executeStatement('DELETE FROM '.$table);
         }

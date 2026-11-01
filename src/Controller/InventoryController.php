@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Dto\InventoryRequest;
 use App\Entity\Inventory;
 use App\Entity\Product;
+use App\Message\LowStockReached;
 use Doctrine\ORM\EntityManagerInterface;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -15,6 +16,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -27,8 +29,10 @@ final class InventoryController extends AbstractController
 {
     private const READ = ['groups' => 'inventory:read'];
 
-    public function __construct(private readonly EntityManagerInterface $em)
-    {
+    public function __construct(
+        private readonly EntityManagerInterface $em,
+        private readonly MessageBusInterface $bus,
+    ) {
     }
 
     #[Route('/{productId}', name: 'api_inventory_show', methods: ['GET'])]
@@ -86,9 +90,20 @@ final class InventoryController extends AbstractController
             );
         }
 
-        $inventory->setQuantity($request->getQuantity())
-            ->setLowStockThreshold($request->getLowStockThreshold());
-        $this->em->flush();
+        $alreadyLow = $inventory->isLowStock();
+
+        $this->em->wrapInTransaction(function () use ($inventory, $request, $alreadyLow): void {
+            $inventory->setQuantity($request->getQuantity())
+                ->setLowStockThreshold($request->getLowStockThreshold());
+            $this->em->flush();
+
+            // dispatch low stock alert only if stock was not low and is low now
+            if (!$alreadyLow && $inventory->isLowStock()) {
+                $this->bus->dispatch(new LowStockReached(
+                    $inventory->getProductId() ?? throw new \LogicException('Inventory points at an unsaved product.')
+                ));
+            }
+        });
 
         return $this->json($inventory, Response::HTTP_OK, [], self::READ);
     }

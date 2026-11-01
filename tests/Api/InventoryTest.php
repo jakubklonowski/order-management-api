@@ -8,6 +8,7 @@ use App\Entity\Category;
 use App\Entity\Inventory;
 use App\Entity\Product;
 use App\Enum\UserRole;
+use App\Message\LowStockReached;
 use App\Tests\ApiTestCase;
 
 final class InventoryTest extends ApiTestCase
@@ -67,6 +68,14 @@ final class InventoryTest extends ApiTestCase
         self::assertNotNull($inventory);
 
         return $inventory;
+    }
+
+    private function assertOnlyAnAlertIsQueuedFor(Product $product): void
+    {
+        $productId = $product->getId();
+        self::assertNotNull($productId);
+
+        self::assertEquals([new LowStockReached($productId)], $this->queuedMessages());
     }
 
     public function testReadingRequiresAuthentication(): void
@@ -232,5 +241,56 @@ final class InventoryTest extends ApiTestCase
         $this->request('PUT', '/api/inventory/999999', self::payload(), $this->adminToken);
 
         self::assertResponseStatusCodeSame(404);
+    }
+
+    public function testLoweringTheQuantityToTheThresholdQueuesAnAlert(): void
+    {
+        $product = $this->stocked(quantity: 10, threshold: 3);
+
+        $this->request('PUT', '/api/inventory/'.$product->getId(), self::payload(3, 3), $this->adminToken);
+
+        self::assertResponseIsSuccessful();
+        $this->assertOnlyAnAlertIsQueuedFor($product);
+    }
+
+    public function testRaisingTheThresholdAboveAvailableStockQueuesAnAlert(): void
+    {
+        $product = $this->stocked(quantity: 10, threshold: 3);
+
+        $this->request('PUT', '/api/inventory/'.$product->getId(), self::payload(10, 12), $this->adminToken);
+
+        self::assertResponseIsSuccessful();
+        $this->assertOnlyAnAlertIsQueuedFor($product);
+    }
+
+    public function testLoweringAlreadyLowStockQueuesNoAlert(): void
+    {
+        $product = $this->stocked(quantity: 10, reserved: 8, threshold: 3);
+
+        $this->request('PUT', '/api/inventory/'.$product->getId(), self::payload(9, 3), $this->adminToken);
+
+        self::assertResponseIsSuccessful();
+        self::assertSame([], $this->queuedMessages());
+    }
+
+    public function testUpdatingStockThatStaysAboveTheThresholdQueuesNoAlert(): void
+    {
+        $product = $this->stocked(quantity: 10, threshold: 3);
+
+        $this->request('PUT', '/api/inventory/'.$product->getId(), self::payload(25, 5), $this->adminToken);
+
+        self::assertResponseIsSuccessful();
+        self::assertSame([], $this->queuedMessages());
+    }
+
+    // newly created stock doesn't queue alert, even if it's created below threshold
+    public function testCreatingTheStockRecordQueuesNoAlert(): void
+    {
+        $product = $this->product();
+
+        $this->request('PUT', '/api/inventory/'.$product->getId(), self::payload(1, 5), $this->adminToken);
+
+        self::assertResponseStatusCodeSame(201);
+        self::assertSame([], $this->queuedMessages());
     }
 }

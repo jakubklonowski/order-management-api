@@ -1,0 +1,7 @@
+Thank you for your order #{{ order.id }}.
+
+{% for item in order.items %}
+{{ item.product.name }} x {{ item.quantity }} @ {{ item.unitPrice }}
+{% endfor %}
+
+Total: {{ order.totalPrice }}

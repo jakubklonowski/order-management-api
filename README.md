@@ -4,12 +4,14 @@
 A REST API for e-commerce order and inventory management.
 
 Stack: Symfony 7.4, Doctrine ORM 3, MySQL 8.4, Composer, PHP 8.3, PHPUnit 12,
-LexikJWTAuthenticationBundle, NelmioApiDocBundle (OpenAPI 3), Monolog, PHP-CS-Fixer, PHPStan (level 8),
+LexikJWTAuthenticationBundle, NelmioApiDocBundle (OpenAPI 3), Symfony Messenger (Doctrine transport),
+Symfony Mailer with Mailpit, Monolog, PHP-CS-Fixer, PHPStan (level 8),
 running entirely in Docker.
 
-The domain is deliberately ordinary — categories, products, stock, orders. Three things worth a reviewer's time:
+The domain is deliberately ordinary — categories, products, stock, orders. Four things worth a closer look:
 
 - **Stock is locked, not checked.** `SELECT ... FOR UPDATE` in sorted product order to rule out deadlocks, plus a refresh hint because Doctrine's identity map handed back a stale row after the wait — and a concurrency test that proves the request actually blocked. → [Decisions](#decisions)
+- **A message can't outlive its order.** The queue is a table in the same database as the orders. Saving an order and queuing its message happen in one transaction, so either both are saved or neither is. No extra process is needed to forward messages (transactional outbox pattern). A test queues a message inside a transaction that fails and checks that the queue stays empty. → [Decisions](#decisions)
 - **An N+1 that no serializer group could fix.** The inverse side of a one-to-one is queried during hydration, before groups are consulted. Measured: one extra query per product without the join, none with it, pinned by a test that counts statements. → [Decisions](#decisions)
 - **Tests checked by breaking the code they guard.** Each assertion verified by hand: mutate the code, confirm the named test — and only that test — fails. It repeatedly caught tests that were green for the wrong reason. → [Tests](#tests-and-quality)
 
@@ -50,6 +52,20 @@ Status moves `pending → confirmed → shipped`, with `cancelled` reachable fro
 and `confirmed` only. The transition table is in the enum, `Order::changeStatus()` is
 the only method that can move the status, and every move writes a row to `order_status_history`.
 
+### Mailer
+
+Two emails are sent by a Messenger worker, not during the request:
+
+- **Order confirmation**, to customer when order is placed.
+- **Low-stock alert**, to every admin when stock reaches its threshold (available <= threshold).
+
+Low stock alert fires on treshold *crossing*: when an order or a `PUT /api/inventory/{productId}` takes available
+stock from above the threshold to equal to treshold or below it. Stock that stays low sends nothing, and neither
+does creating a product's first stock record, which has no earlier state to cross from. Shipping and
+cancelling cannot cross the threshold.
+
+[Mailpit](http://localhost:8025) catches everything the app sends.
+
 ## How to run
 
 Running this program requires **only Docker**, which runs PHP, Composer and MySQL.
@@ -75,7 +91,9 @@ What `setup.sh` does:
 - installs dependencies
 - migrates the dev and test databases
 - generates the JWT keypair
+- restarts the queue worker, which crash-loops on a fresh clone until the dependencies and the queue table exist
 - creates the admin account - setup asks for the password twice here before finishing its work
+- prints the URLs, Mailpit's included
 
 Every step is safe to repeat, so re-running is not a problem.
 
@@ -85,7 +103,18 @@ a new one generated, or `/api/login` will fail.
 After setup, the API is available at **http://localhost:8080**, and its interactive
 documentation at **http://localhost:8080/api/doc**.
 To use another port, change the `NGINX_PORT` value in `.env`.
-Adminer is on port `8081` for browsing the database directly.
+Adminer is on port `8081` for browsing the database directly, and Mailpit on `8025` for reading the mail
+the app sends.
+
+### The queue worker
+
+Emails are sent by the `worker` container, which runs `messenger:consume async`.
+
+docker compose restart worker    # after changing PHP code, otherwise it runs the code it started with
+docker compose logs -f worker    # watch messages being handled
+
+A message that fails is retried three times and then moves to the `failed` queue
+(`messenger:failed:show` lists it).
 
 ## Trying it
 
@@ -153,6 +182,8 @@ ORDER=$(curl -s -X POST http://localhost:8080/api/orders \
 
 The order comes back with `"totalPrice":"59.97"`, and
 `GET /api/inventory/$PRODUCT` now reports 10 on hand, 3 reserved, 7 available.
+A few seconds later the confirmation is in Mailpit at **http://localhost:8025**: the worker picked
+the message up and mailed it.
 
 **5. Move it through the lifecycle.** Status changes are admin-only, and the order
 cannot skip confirmation — `shipped` straight from `pending` answers 409.
@@ -184,15 +215,21 @@ send `"price": 19.99` as a number (422), ask for someone else's order with your 
 token (403), or change a status as a customer (403). Every one of them answers the same
 error shape.
 
+On the success path, order enough of the product to leave 2 or fewer (the threshold from
+step 3): the admin gets a low-stock alert in Mailpit. Order one more and nothing is sent,
+because the alert fires only when the threshold is crossed.
+
 ## Tests and quality
 
 ```bash
 docker compose exec php php bin/phpunit
 ```
 
-There are **178 tests, 578 assertions**, separated into three groups.
+There are **196 tests, 637 assertions**, separated into three groups.
 Unit tests are in `tests/Entity`, `tests/Enum` and `tests/EventListener` - they need no container.
-`tests/Command` boots the kernel.
+`tests/Command`, `tests/Messenger` and `tests/MessageHandler` boot the kernel: `tests/Messenger` reads the
+real queue table, and `tests/MessageHandler` runs the real handlers with a null mailer, so mails are asserted
+without being sent.
 Tests in `tests/Api` drive the full HTTP stack against a real MySQL database.
 Among them, `ApiDocTest` fails when the OpenAPI spec drifts from the code, e.g. an undocumented
 route or a required field documented as optional.
@@ -261,6 +298,29 @@ a one-to-one relation, so Doctrine has already populated the identity map from a
 read, and without `HINT_REFRESH` a transaction that waited for the lock would be handed
 the stale cached entity — silently defeating the thing it just waited for.
 
+**The queue is a table, so a message can't outlive its order.** Messenger runs on the Doctrine
+transport, on the same connection as ORM. `OrderPlacer` already works inside a transaction,
+so dispatching `OrderPlaced` there is an `INSERT` in that transaction: the order and its message
+commit or roll back together, an outbox with no relay process. The worker reads with
+`FOR UPDATE SKIP LOCKED`, which skips rows from a transaction that has not committed, so it never
+loads an order that doesn't exist yet. The DSN says `auto_setup=0` because the migration owns the
+table.
+
+The price of the table is polling: an idle worker runs one short locking `SELECT` a second, and each
+message costs an insert, an update and a delete. That is negligible at this size and the first thing to
+measure if volume grows by orders of magnitude. Moving to another broker later means keeping the
+table on the dispatching side and adding that relay.
+
+**Mail is sent inside the handler, and the stock alert fires only on crossing.** By default the mailer
+does not send mail itself: it puts the mail on the Messenger bus as a second message. The handler
+would then finish and record the confirmation as sent while the mail was still waiting in the queue,
+and if delivery failed, only that second message would be retried, while the handler had already finished
+and marked the order as confirmed. `framework.mailer.message_bus` is `false`, so the handler talks to
+the mail server directly. A failed send fails the handler, and the whole message is retried.
+The low-stock alert compares `isLowStock()` before and after a change and fires only when it flips;
+otherwise every order placed while stock is low would mail the admins again. The handler checks once more 
+when it runs, because the mail reports current numbers and the stock may have been replenished in between.
+
 **Logs go where the environment collects them.** Dev and test write to files under
 `var/log`, so a test run shows its own output and nothing else. Production writes JSON
 to `stderr` instead, because in a container the runtime is what collects logs.
@@ -283,6 +343,7 @@ join in `ProductRepository::paginate()`, measured on a three-product page:
 **5 queries without the join, 2 with it.** The two are the floor for any paginated
 listing — one count, one fetch; the extra three were one inventory lookup per product,
 growing with the page size.
+
 ## Known problems
 
 Stated plainly rather than left to be discovered.
@@ -305,5 +366,4 @@ drift itself is still reachable. Order placement, where it actually matters, doe
 - **Seed data**, so a fresh setup has categories, products and stock to try the API against without creating them by hand first
 - **Domain indexes and a timestamp-precision migration** as schema changes
 - **Promo codes applied to order totals**, which is what the `bcmath` groundwork is for
-- **Redis caching** on the product listing
 - **Row locking on the inventory endpoint**, closing the race described in the Known problems section above

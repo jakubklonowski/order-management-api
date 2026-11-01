@@ -7,6 +7,7 @@ services:
       dockerfile: docker/php/Dockerfile
       target: dev
     container_name: oms_php
+    restart: unless-stopped
     environment:
       XDEBUG_MODE: ${XDEBUG_MODE:-off}
     volumes:
@@ -15,7 +16,28 @@ services:
     depends_on:
       database:
         condition: service_healthy
-      redis:
+    networks:
+      - oms_network
+
+  # messenger:consume async worker; fresh clone crash-loops until vendor/ and messenger table exists
+  # --time-limit and --memory-limit paired with restart policy for memory conservation
+  worker:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: dev
+    container_name: oms_worker
+    restart: unless-stopped
+    command: php bin/console messenger:consume async --time-limit=3600 --memory-limit=128M -vv
+    environment:
+      XDEBUG_MODE: ${XDEBUG_MODE:-off}
+    volumes:
+      - ./:/var/www/html
+    working_dir: /var/www/html
+    depends_on:
+      database:
+        condition: service_healthy
+      mailpit:
         condition: service_started
     networks:
       - oms_network
@@ -23,6 +45,7 @@ services:
   nginx:
     image: nginx:stable-alpine
     container_name: oms_nginx
+    restart: unless-stopped
     ports:
       - "${NGINX_PORT:-8080}:80"
     volumes:
@@ -36,6 +59,7 @@ services:
   database:
     image: mysql:8.4
     container_name: oms_database
+    restart: unless-stopped
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
@@ -54,20 +78,11 @@ services:
     networks:
       - oms_network
 
-  redis:
-    image: redis:7-alpine
-    container_name: oms_redis
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - oms_network
-
   # http://localhost:${ADMINER_PORT}
   adminer:
     image: adminer:latest
     container_name: oms_adminer
+    restart: unless-stopped
     environment:
       ADMINER_DEFAULT_SERVER: database
     ports:
@@ -77,16 +92,13 @@ services:
     networks:
       - oms_network
 
-  # http://localhost:${REDIS_COMMANDER_PORT}
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    container_name: oms_redis_commander
-    environment:
-      REDIS_HOSTS: local:redis:6379
+  # http://localhost:${MAILPIT_PORT}
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: oms_mailpit
+    restart: unless-stopped
     ports:
-      - "${REDIS_COMMANDER_PORT:-8082}:8081"
-    depends_on:
-      - redis
+      - "${MAILPIT_PORT:-8025}:8025"
     networks:
       - oms_network
 
@@ -96,4 +108,3 @@ networks:
 
 volumes:
   db_data:
-  redis_data:

@@ -15,6 +15,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 abstract class ApiTestCase extends WebTestCase
 {
     use ClearsDatabase;
+    use UsesMessenger;
 
     protected KernelBrowser $client;
     protected EntityManagerInterface $em;

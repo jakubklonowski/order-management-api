@@ -11,6 +11,8 @@ use App\Entity\Product;
 use App\Entity\User;
 use App\Enum\OrderStatus;
 use App\Enum\UserRole;
+use App\Message\LowStockReached;
+use App\Message\OrderPlaced;
 use App\Tests\ApiTestCase;
 
 final class OrderTest extends ApiTestCase
@@ -198,6 +200,64 @@ final class OrderTest extends ApiTestCase
         self::assertCount(1, $this->responseBody()['items']);
         self::assertSame(5, $this->responseBody()['items'][0]['quantity']);
         self::assertSame(5, $this->availableFor($product));
+    }
+
+    public function testOrderPlacingQueuesOnlyConfirmationMessage(): void
+    {
+        // helper function sets threshold to 2, test will reserve 3 items out of 10 in stock - no alert expected
+        $product = $this->product('SKU-1', '19.99', 10);
+
+        $this->request('POST', '/api/orders', self::payload([
+            ['productId' => $product->getId(), 'quantity' => 3],
+        ]), $this->customerToken);
+
+        self::assertResponseStatusCodeSame(201);
+        self::assertEquals([new OrderPlaced($this->responseBody()['id'])], $this->queuedMessages());
+    }
+
+    public function testRejectedOrderQueuesNothing(): void
+    {
+        $plenty = $this->product('SKU-1', '19.99', 10);
+        $scarce = $this->product('SKU-2', '19.99', 1);
+
+        // first product would cause low stock alert, second product should fail whole order
+        $this->request('POST', '/api/orders', self::payload([
+            ['productId' => $plenty->getId(), 'quantity' => 8],
+            ['productId' => $scarce->getId(), 'quantity' => 5],
+        ]), $this->customerToken);
+
+        self::assertResponseStatusCodeSame(409);
+        self::assertSame([], $this->queuedMessages());
+    }
+
+    // low stock is available <= threshold
+    public function testReachingTheThresholdQueuesALowStockAlert(): void
+    {
+        $product = $this->product('SKU-1', '19.99', 10);
+        $productId = $product->getId();
+        self::assertNotNull($productId);
+
+        $this->request('POST', '/api/orders', self::payload([
+            ['productId' => $productId, 'quantity' => 8],
+        ]), $this->customerToken);
+
+        self::assertResponseStatusCodeSame(201);
+        self::assertEquals(
+            [new OrderPlaced($this->responseBody()['id']), new LowStockReached($productId)],
+            $this->queuedMessages(),
+        );
+    }
+
+    public function testAnOrderForAlreadyLowStockQueuesNoAlert(): void
+    {
+        $product = $this->product('SKU-1', '19.99', 2);
+
+        $this->request('POST', '/api/orders', self::payload([
+            ['productId' => $product->getId(), 'quantity' => 1],
+        ]), $this->customerToken);
+
+        self::assertResponseStatusCodeSame(201);
+        self::assertEquals([new OrderPlaced($this->responseBody()['id'])], $this->queuedMessages());
     }
 
     public function testOrderRejectsUnknownProduct(): void

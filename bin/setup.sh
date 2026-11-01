@@ -32,6 +32,10 @@ docker compose exec -T php php bin/console doctrine:migrations:migrate --no-inte
 step 'Generating the JWT keypair'
 docker compose exec -T php php bin/console lexik:jwt:generate-keypair --skip-if-exists
 
+step 'Restarting the queue worker'
+# fresh clone needs restart as vendor\ didn't exist when it first launched
+docker compose restart worker
+
 step "Creating admin account ${ADMIN_EMAIL}"
 # validated with the same rules as POST /api/register
 printf 'The password must be at least 8 characters.\n\n'
@@ -45,11 +49,13 @@ fi
 
 NGINX_PORT="$(grep -E '^NGINX_PORT=' .env | cut -d= -f2)"
 ADMINER_PORT="$(grep -E '^ADMINER_PORT=' .env | cut -d= -f2)"
+MAILPIT_PORT="$(grep -E '^MAILPIT_PORT=' .env | cut -d= -f2)"
 
 printf '\nThe API is at http://localhost:%s\n\n' "${NGINX_PORT:-8080}"
 printf '  API docs:       http://localhost:%s/api/doc\n' "${NGINX_PORT:-8080}"
 printf '  Run the tests:  docker compose exec php php bin/phpunit\n'
 printf '  Browse the DB:  http://localhost:%s\n' "${ADMINER_PORT:-8081}"
+printf '  Read the mail:  http://localhost:%s\n' "${MAILPIT_PORT:-8025}"
 
 if [ "${admin_created}" = no ]; then
     cat <<EOF
